@@ -8,7 +8,7 @@ public:
     explicit Hud(const std::string& directory);
     ~Hud();
     void render(int width, int height, const Rocket& rocket, double fps,
-                bool padLight, bool mouseCaptured);
+                bool padLight, bool mouseCaptured, bool chaseCamera);
 private:
     struct Pixel { float x,y,r,g,b,a; };
     Shader shader_;

@@ -1,9 +1,16 @@
 #include "Camera.h"
 #include <algorithm>
+#include <cmath>
+
+namespace {
+constexpr math3d::vec3 chaseOffset{14.0, 6.0, 21.0};
+constexpr double chaseResponse = 5.0;
+}
 
 Camera::Camera() { home(); }
 
 void Camera::home() {
+    chasing_ = false;
     position_ = {26,17,32};
     const auto d = math3d::normalized(math3d::vec3{-1,6,0} - position_);
     yaw_ = std::atan2(d.z, d.x);
@@ -16,11 +23,13 @@ math3d::vec3 Camera::direction() const {
 }
 
 void Camera::look(double dx, double dy) {
+    if (chasing_) return;
     yaw_ += dx*0.0025;
     pitch_ = std::max(-1.48, std::min(1.48, pitch_ - dy*0.0025));
 }
 
 void Camera::move(double forward, double right, double vertical, double dt, bool fast) {
+    if (chasing_) return;
     const auto f = direction();
     const auto r = math3d::normalized(math3d::cross(f, {0,1,0}));
     auto velocity = f*forward + r*right + math3d::vec3{0,vertical,0};
@@ -30,6 +39,24 @@ void Camera::move(double forward, double right, double vertical, double dt, bool
     position_.y = std::max(0.8, position_.y);
 }
 
+void Camera::toggleChase(const math3d::vec3& target) {
+    chasing_ = !chasing_;
+    if (chasing_) chaseTarget_ = target;
+}
+
+void Camera::follow(const math3d::vec3& target, double dt) {
+    if (!chasing_ || dt <= 0.0 || !std::isfinite(dt)) return;
+    // exponential smoothing gives the same response across frame intervals.
+    const double blend = -std::expm1(-chaseResponse * dt);
+    chaseTarget_ = chaseTarget_ + (target - chaseTarget_) * blend;
+}
+
+math3d::vec3 Camera::position() const {
+    return chasing_ ? chaseTarget_ + chaseOffset : position_;
+}
+
 math3d::mat4 Camera::view() const {
-    return math3d::look_at(position_, position_ + direction(), {0,1,0});
+    const auto eye = position();
+    const auto target = chasing_ ? chaseTarget_ : eye + direction();
+    return math3d::look_at(eye, target, {0,1,0});
 }

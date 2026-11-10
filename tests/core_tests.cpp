@@ -80,6 +80,30 @@ void cameraTests() {
     for (float f:one.view()) expect(std::isfinite(f),"extreme mouse input keeps view finite");
     one.home(); Camera initial;
     expect(math3d::length(one.position()-initial.position())<1e-5,"home restores camera");
+
+    one.move(0,1,0,0.5,false);
+    one.look(70,-20);
+    const auto freeView = one.view();
+    const math3d::vec3 onPad{0,6,0}, ascending{0,26,0};
+    one.toggleChase(onPad);
+    const auto initialChasePosition = one.position();
+    const auto centered = math3d::transform_point(one.view(), onPad);
+    expect(one.chasing() && close(centered.x,0) && close(centered.y,0) && centered.z<0,
+           "chase view centers the rocket on entry");
+    one.follow(ascending,0.2);
+    const double rise = one.position().y-initialChasePosition.y;
+    expect(rise>0 && rise<20,"chase view follows ascent smoothly");
+    many.toggleChase(onPad);
+    for (int i=0; i<20; ++i) many.follow(ascending,0.01);
+    expect(math3d::length(one.position()-many.position())<1e-5,
+           "chase smoothing uses elapsed time");
+    one.move(1,1,1,0.5,true);
+    one.look(60,30);
+    one.toggleChase(ascending);
+    expect(!one.chasing() && one.view()==freeView,"leaving chase restores the original free view");
+    one.toggleChase(ascending);
+    one.home();
+    expect(!one.chasing() && one.view()==initial.view(),"home resets chase to the initial free view");
 }
 
 void meshTest(const MeshData& mesh) {

@@ -7,10 +7,15 @@ public:
     void home();
     void look(double dx, double dy);
     void move(double forward, double right, double vertical, double dt, bool fast);
+    void toggleChase(const math3d::vec3& target);
+    void follow(const math3d::vec3& target, double dt);
+    bool chasing() const { return chasing_; }
     math3d::mat4 view() const;
-    const math3d::vec3& position() const { return position_; }
+    math3d::vec3 position() const;
 private:
     math3d::vec3 direction() const;
     math3d::vec3 position_{0,0,0};
     double yaw_ = 0.0, pitch_ = 0.0;
+    bool chasing_ = false;
+    math3d::vec3 chaseTarget_{0,0,0};
 };

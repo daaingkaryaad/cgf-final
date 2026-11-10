@@ -55,6 +55,11 @@ State& state(GLFWwindow* window) {
     return *static_cast<State*>(glfwGetWindowUserPointer(window));
 }
 
+math3d::vec3 rocketCameraTarget(const Rocket& rocket) {
+    // aim near the midpoint of the rocket in its current world position.
+    return math3d::transform_point(rocket.model(), {0,5.5,0});
+}
+
 void captureMouse(GLFWwindow* window,bool capture) {
     auto& app=state(window);
     app.captured=capture;
@@ -70,7 +75,13 @@ void onKey(GLFWwindow* window,int key,int,int action,int) {
         case GLFW_KEY_R: app.rocket.reset(); app.camera.home(); app.padLight=true; break;
         case GLFW_KEY_H: app.camera.home(); break;
         case GLFW_KEY_L: app.padLight=!app.padLight; break;
-        case GLFW_KEY_TAB: captureMouse(window,!app.captured); break;
+        case GLFW_KEY_C:
+            app.camera.toggleChase(rocketCameraTarget(app.rocket));
+            if (app.camera.chasing() && app.captured) captureMouse(window,false);
+            break;
+        case GLFW_KEY_TAB:
+            if (!app.camera.chasing()) captureMouse(window,!app.captured);
+            break;
         case GLFW_KEY_ESCAPE:
             if (app.captured) captureMouse(window,false);
             else glfwSetWindowShouldClose(window,GLFW_TRUE);
@@ -88,7 +99,8 @@ void onMouse(GLFWwindow* window,double x,double y) {
 }
 
 void onClick(GLFWwindow* window,int button,int action,int) {
-    if (button==GLFW_MOUSE_BUTTON_LEFT && action==GLFW_PRESS) captureMouse(window,true);
+    if (button==GLFW_MOUSE_BUTTON_LEFT && action==GLFW_PRESS && !state(window).camera.chasing())
+        captureMouse(window,true);
 }
 
 void onFocus(GLFWwindow* window,int focused) {
@@ -132,7 +144,7 @@ void run(GLFWwindow* window,const Options& settings) {
     if (settings.simulate>=0) { app.rocket.start(); app.rocket.update(settings.simulate); }
     double last=glfwGetTime(), fpsStart=last, fps=0;
     int frameCount=0,totalFrames=0;
-    std::cout<<"space launch | r reset scene | l pad light | h home camera\n"
+    std::cout<<"space launch | r reset scene | l pad light | h home camera | c camera mode\n"
              <<"wasd move | q/e down/up | shift faster | click/tab capture mouse\n"
              <<"esc releases mouse; esc again closes the window\n";
     while (!glfwWindowShouldClose(window)) {
@@ -146,12 +158,13 @@ void run(GLFWwindow* window,const Options& settings) {
         if (width==0 || height==0) { glfwWaitEventsTimeout(0.05); continue; }
         moveCamera(window,dt);
         app.rocket.update(dt);
+        app.camera.follow(rocketCameraTarget(app.rocket),dt);
         glViewport(0,0,width,height);
         glClearColor(0.65f,0.73f,0.72f,1);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         const auto projection=math3d::perspective(50.0*math3d::pi/180.0,double(width)/height,0.1,600.0);
         scene.render(app.camera.view(),projection,app.camera.position(),app.rocket,app.padLight);
-        hud.render(width,height,app.rocket,fps,app.padLight,app.captured);
+        hud.render(width,height,app.rocket,fps,app.padLight,app.captured,app.camera.chasing());
         ++frameCount;
         ++totalFrames;
         if (now-fpsStart>=0.5) {
