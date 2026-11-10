@@ -13,6 +13,8 @@ uniform int emissive;
 uniform float specularStrength;
 uniform float textureRepeat;
 uniform sampler2D surfaceTexture;
+uniform float skyDarkness;
+uniform vec3 darkHorizon;
 
 vec3 phong(vec3 n, vec3 v, vec3 l, vec3 albedo, vec3 lightColour) {
     float diffuse = max(dot(n,l),0.0);
@@ -35,7 +37,11 @@ void main() {
         colour += attenuation*phong(n,v,normalize(delta),albedo,vec3(1.35,1.11,0.66));
     }
     if (emissive != 0) colour = baseColour;
-    float fog = 1.0-exp(-0.0016*length(eyePosition-worldPosition));
-    colour = mix(colour,vec3(0.69,0.73,0.68),fog);
+    float distanceToEye = length(eyePosition-worldPosition);
+    float dayFog = 1.0-exp(-0.0016*distanceToEye);
+    vec3 daylight = mix(colour,vec3(0.69,0.73,0.68),dayFog);
+    // blend distant terrain into the dark horizon, keeping the nearby rocket lit.
+    vec3 highAltitude = mix(colour,darkHorizon,smoothstep(30.0,180.0,distanceToEye));
+    colour = mix(daylight,highAltitude,skyDarkness);
     fragmentColour = vec4(clamp(colour,0.0,1.0),1.0);
 }
