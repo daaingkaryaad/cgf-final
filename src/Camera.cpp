@@ -11,6 +11,7 @@ Camera::Camera() { home(); }
 
 void Camera::home() {
     chasing_ = false;
+    updateIgnitionShake(false,0.0);
     position_ = {26,17,32};
     const auto d = math3d::normalized(math3d::vec3{-1,6,0} - position_);
     yaw_ = std::atan2(d.z, d.x);
@@ -51,12 +52,29 @@ void Camera::follow(const math3d::vec3& target, double dt) {
     chaseTarget_ = chaseTarget_ + (target - chaseTarget_) * blend;
 }
 
+void Camera::updateIgnitionShake(bool igniting, double dt) {
+    if (!igniting) {
+        shakeTime_ = 0.0;
+        shakeOffset_ = {0,0,0};
+        return;
+    }
+    if (dt <= 0.0 || !std::isfinite(dt)) return;
+    shakeTime_ += dt;
+    // ramp in briefly, then let the vibration decay during ignition.
+    const double ramp = std::min(1.0,shakeTime_ / 0.08);
+    const double strength = 0.26 * ramp * std::exp(-3.5 * shakeTime_);
+    shakeOffset_ = math3d::vec3{std::sin(45.0 * shakeTime_),
+                              0.7 * std::sin(61.0 * shakeTime_),
+                              0.45 * std::sin(39.0 * shakeTime_)} * strength;
+}
+
 math3d::vec3 Camera::position() const {
-    return chasing_ ? chaseTarget_ + chaseOffset : position_;
+    const auto base = chasing_ ? chaseTarget_ + chaseOffset : position_;
+    return base + shakeOffset_;
 }
 
 math3d::mat4 Camera::view() const {
     const auto eye = position();
-    const auto target = chasing_ ? chaseTarget_ : eye + direction();
+    const auto target = chasing_ ? chaseTarget_ + shakeOffset_ : eye + direction();
     return math3d::look_at(eye, target, {0,1,0});
 }

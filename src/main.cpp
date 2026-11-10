@@ -159,6 +159,7 @@ void run(GLFWwindow* window,const Options& settings) {
         moveCamera(window,dt);
         app.rocket.update(dt);
         app.camera.follow(rocketCameraTarget(app.rocket),dt);
+        app.camera.updateIgnitionShake(app.rocket.stage()==Rocket::Stage::ignition,dt);
         glViewport(0,0,width,height);
         glClearColor(0.65f,0.73f,0.72f,1);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);

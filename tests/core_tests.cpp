@@ -104,6 +104,24 @@ void cameraTests() {
     one.toggleChase(ascending);
     one.home();
     expect(!one.chasing() && one.view()==initial.view(),"home resets chase to the initial free view");
+
+    const auto rest = one.position();
+    one.updateIgnitionShake(false,0.08);
+    expect(one.view()==initial.view(),"camera stays steady before ignition");
+    one.updateIgnitionShake(true,0.08);
+    const double vibration = math3d::length(one.position()-rest);
+    expect(vibration>0.01 && vibration<0.4,"ignition shake adds a small visible offset");
+    one.updateIgnitionShake(true,1.0);
+    expect(math3d::length(one.position()-rest)<vibration,"ignition shake fades during ignition");
+    one.updateIgnitionShake(false,0.02);
+    expect(one.view()==initial.view(),"leaving ignition clears shake without camera drift");
+
+    one.toggleChase(onPad);
+    const auto steadyChase = one.view();
+    one.updateIgnitionShake(true,0.08);
+    expect(one.view()!=steadyChase,"ignition shake also works in chase mode");
+    one.home();
+    expect(!one.chasing() && one.view()==initial.view(),"reset clears ignition shake and chase mode");
 }
 
 void meshTest(const MeshData& mesh) {
