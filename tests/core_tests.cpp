@@ -54,6 +54,40 @@ void launchTests() {
     expect(close(rocket.altitude(),oldAltitude),"invalid update durations are ignored");
 }
 
+void boosterTests() {
+    using namespace math3d;
+    const double separation = 4.2+std::sqrt(2.0*54.0/1.1);
+    const vec3 pivot{0,3.2,0};
+    Rocket rocket;
+    const auto initial = rocket.boosterModel(0);
+    rocket.start();
+    rocket.update(separation-0.001);
+    const auto before = transform_point(rocket.boosterModel(0),pivot);
+    expect(!rocket.boostersSeparated() && rocket.boostersVisible(),"boosters stay attached below separation altitude");
+    expect(close(before.y,transform_point(initial,pivot).y+rocket.altitude()),"attached booster follows core altitude");
+    rocket.update(0.002);
+    expect(rocket.boostersSeparated(),"boosters separate at 54 scene units");
+    expect(length(transform_point(rocket.boosterModel(0),pivot)-before)<0.03,"separation preserves the attached pose");
+    rocket.update(0.8);
+    const auto drifting = transform_point(rocket.boosterModel(0),pivot);
+    const auto opposite = transform_point(rocket.boosterModel(2),pivot);
+    expect(drifting.x>before.x+3 && opposite.x<-3,"opposite boosters drift apart");
+    expect(std::abs(transform_point(rocket.boosterModel(0),{0,5.8,0}).x-drifting.x)>1,
+           "detached booster tumbles around its center");
+    rocket.update(1.7);
+    expect(transform_point(rocket.boosterModel(0),pivot).y<drifting.y,"detached booster falls while core rises");
+    rocket.update(0.6);
+    expect(rocket.stage()==Rocket::Stage::complete && rocket.boostersVisible(),"boosters keep falling after ascent ends");
+    rocket.update(1.1);
+    expect(!rocket.boostersVisible(),"boosters leave the scene after falling below the terrain");
+    rocket.reset();
+    expect(!rocket.boostersSeparated() && rocket.boostersVisible() && rocket.boosterModel(0)==initial,
+           "reset reattaches boosters to the starting rocket");
+    rocket.start();
+    rocket.update(separation+0.3);
+    expect(rocket.boostersSeparated() && rocket.boostersVisible(),"relaunch separates boosters again");
+}
+
 void transformTests() {
     using namespace math3d;
     const vec3 localPoint{0.4,1,0};
@@ -102,7 +136,7 @@ void meshTest(const MeshData& mesh) {
 
 int main() {
     try {
-        launchTests(); transformTests(); cameraTests();
+        launchTests(); boosterTests(); transformTests(); cameraTests();
         meshTest(geometry::box()); meshTest(geometry::plane());
         meshTest(geometry::frustum(1)); meshTest(geometry::frustum(0)); meshTest(geometry::frustum(0.58f));
         std::cout<<checks<<" checks passed: launch, hierarchy, camera, geometry\n";

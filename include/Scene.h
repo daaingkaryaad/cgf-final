@@ -27,7 +27,7 @@ private:
     Shader shader_, sky_;
     Texture concrete_;
     GLuint skyVao_ = 0;
-    std::vector<Part> site_, rocket_;
+    std::vector<Part> site_, rocket_, booster_;
     void buildSite();
     void buildRocket();
     void add(std::vector<Part>& list, Shape shape, const math3d::vec3& pos,
