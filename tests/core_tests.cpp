@@ -2,6 +2,7 @@
 #include "Geometry.h"
 #include "Rocket.h"
 #include <cmath>
+#include <functional>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -67,6 +68,26 @@ void transformTests() {
     const vec3 bottom=transform_point(segment,{0,-0.5,0});
     const vec3 top=transform_point(segment,{0,0.5,0});
     expect(length(bottom-vec3{1,2,3})<1e-5 && length(top-vec3{4,7,9})<1e-5,"beam endpoints");
+}
+
+void projectionTests() {
+    using namespace math3d;
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const auto validPerspective = perspective(pi/3, 16.0/9.0, 0.1, 1000.0);
+    const auto validOrtho = orthographic(-5,5,-4,4,0.1,1000.0);
+    for (float value : validPerspective) expect(std::isfinite(value),"valid perspective is finite");
+    for (float value : validOrtho) expect(std::isfinite(value),"valid orthographic matrix is finite");
+    const auto invalid = [](const std::function<void()>& function) {
+        try { function(); } catch (const std::runtime_error&) { return true; }
+        return false;
+    };
+    expect(invalid([&]{ perspective(nan,1,0.1,100); }),"perspective rejects NaN angle");
+    expect(invalid([&]{ perspective(pi/3,infinity,0.1,100); }),"perspective rejects infinite aspect");
+    expect(invalid([&]{ perspective(pi/3,1,0.1,infinity); }),"perspective rejects infinite far plane");
+    expect(invalid([&]{ orthographic(nan,5,-5,5,0.1,100); }),"orthographic rejects NaN bound");
+    expect(invalid([&]{ orthographic(-5,infinity,-5,5,0.1,100); }),"orthographic rejects infinite bound");
+    expect(invalid([&]{ orthographic(-5,5,-5,5,0.1,infinity); }),"orthographic rejects infinite far plane");
 }
 
 void cameraTests() {
@@ -155,7 +176,7 @@ void meshTest(const MeshData& mesh) {
 
 int main() {
     try {
-        launchTests(); transformTests(); cameraTests();
+        launchTests(); transformTests(); cameraTests(); projectionTests();
         meshTest(geometry::box()); meshTest(geometry::plane());
         meshTest(geometry::frustum(1)); meshTest(geometry::frustum(0)); meshTest(geometry::frustum(0.58f));
         std::cout<<checks<<" checks passed: launch, hierarchy, camera, geometry\n";

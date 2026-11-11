@@ -78,7 +78,9 @@ inline mat4 look_at(const vec3& eye, const vec3& target, const vec3& up) {
 }
 
 inline mat4 perspective(double fovy, double aspect, double near_z, double far_z) {
-    if (!(fovy > 0 && fovy < pi && aspect > 0 && near_z > 0 && far_z > near_z))
+    if (!std::isfinite(fovy) || !std::isfinite(aspect) ||
+        !std::isfinite(near_z) || !std::isfinite(far_z) ||
+        !(fovy > 0 && fovy < pi && aspect > 0 && near_z > 0 && far_z > near_z))
         throw std::runtime_error("invalid perspective parameters");
     const double f = 1.0 / std::tan(fovy * 0.5);
     mat4 result{};
@@ -92,7 +94,10 @@ inline mat4 perspective(double fovy, double aspect, double near_z, double far_z)
 
 inline mat4 orthographic(double left, double right, double bottom, double top,
                          double near_z, double far_z) {
-    if (!(right > left && top > bottom && near_z > 0 && far_z > near_z))
+    if (!std::isfinite(left) || !std::isfinite(right) ||
+        !std::isfinite(bottom) || !std::isfinite(top) ||
+        !std::isfinite(near_z) || !std::isfinite(far_z) ||
+        !(right > left && top > bottom && near_z > 0 && far_z > near_z))
         throw std::runtime_error("invalid orthographic parameters");
     mat4 result = identity();
     result[0] = static_cast<float>(2.0 / (right - left));
