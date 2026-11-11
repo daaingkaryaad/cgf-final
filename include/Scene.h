@@ -1,5 +1,6 @@
 #pragma once
 #include "Mesh.h"
+#include "ParticleSystem.h"
 #include "Shader.h"
 #include "Texture.h"
 #include "Rocket.h"
@@ -14,6 +15,8 @@ public:
     ~Scene();
     void render(const math3d::mat4& view, const math3d::mat4& projection,
                 const math3d::vec3& eye, const Rocket& rocket, bool padLight);
+    void updateExhaust(const Rocket& rocket, double dt);
+    void resetExhaust() { exhaust_.reset(); }
 private:
     enum Shape { box, plane, cylinder, cone, taper, shapeCount };
     struct Part {
@@ -26,6 +29,7 @@ private:
     std::array<std::unique_ptr<Mesh>,shapeCount> meshes_;
     Shader shader_, sky_;
     Texture concrete_;
+    ParticleSystem exhaust_;
     GLuint skyVao_ = 0;
     std::vector<Part> site_, rocket_;
     void buildSite();

@@ -11,7 +11,7 @@ PLATFORM_LIBS = -lGL
 endif
 
 TARGET = baikonur
-SOURCES = src/main.cpp src/Camera.cpp src/Rocket.cpp src/Shader.cpp src/Mesh.cpp src/Geometry.cpp src/Texture.cpp src/Scene.cpp src/Hud.cpp
+SOURCES = src/main.cpp src/Camera.cpp src/Rocket.cpp src/Shader.cpp src/Mesh.cpp src/Geometry.cpp src/Texture.cpp src/Scene.cpp src/Hud.cpp src/ParticleSystem.cpp
 OBJECTS = $(SOURCES:src/%.cpp=build/%.o)
 TEST_SOURCES = tests/core_tests.cpp src/Camera.cpp src/Rocket.cpp src/Geometry.cpp
 

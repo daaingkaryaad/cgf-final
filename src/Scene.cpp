@@ -4,11 +4,15 @@ using math3d::vec3;
 namespace {
 const vec3 cream{0.87,0.86,0.77}, orange{0.82,0.25,0.085}, dark{0.12,0.18,0.18};
 const vec3 steel{0.27,0.34,0.33}, yellow{0.78,0.53,0.14};
+constexpr std::array<vec3,5> nozzleOffsets{{
+    {0,0.263,0}, {1.38,0.08,0}, {0,0.08,1.38}, {-1.38,0.08,0}, {0,0.08,-1.38}
+}};
 }
 
 Scene::Scene(const std::string& directory)
     : shader_(directory+"/basic.vert",directory+"/basic.frag"),
-      sky_(directory+"/sky.vert",directory+"/sky.frag") {
+      sky_(directory+"/sky.vert",directory+"/sky.frag"),
+      exhaust_(directory) {
     meshes_[box].reset(new Mesh(geometry::box()));
     meshes_[plane].reset(new Mesh(geometry::plane()));
     meshes_[cylinder].reset(new Mesh(geometry::frustum(1.0f)));
@@ -116,6 +120,13 @@ void Scene::draw(const Part& part, const math3d::mat4& parent) {
     meshes_[part.shape]->draw();
 }
 
+void Scene::updateExhaust(const Rocket& rocket, double dt) {
+    auto outlets = nozzleOffsets;
+    const auto model = rocket.model();
+    for (auto& outlet : outlets) outlet = math3d::transform_point(model,outlet);
+    exhaust_.update(dt,outlets,rocket.enginesOn());
+}
+
 void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
                    const vec3& eye, const Rocket& rocket, bool padLight) {
     glDisable(GL_DEPTH_TEST);
@@ -141,12 +152,13 @@ void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
         padLight ? vec3{1,0.82,0.40} : vec3{0.2,0.21,0.18},0.1f,0,padLight};
     draw(lens,identity);
     if (rocket.enginesOn()) {
-        Part nozzle{cylinder,math3d::transform({0,0.263,0},{0.39,0.018,0.39}),{1,0.55,0.12},0,0,true};
-        draw(nozzle,rocket.model());
-        for (int i=0; i<4; ++i) {
-            const double a=i*math3d::pi*0.5;
-            nozzle.local=math3d::transform({1.38*std::cos(a),0.08,1.38*std::sin(a)},{0.27,0.018,0.27});
-            draw(nozzle,rocket.model());
+        const auto model = rocket.model();
+        for (std::size_t i=0; i<nozzleOffsets.size(); ++i) {
+            const double radius = i==0 ? 0.39 : 0.27;
+            Part nozzle{cylinder,math3d::transform(nozzleOffsets[i],{radius,0.018,radius}),
+                        {1,0.55,0.12},0,0,true};
+            draw(nozzle,model);
         }
     }
+    exhaust_.render(view,projection);
 }

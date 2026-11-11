@@ -45,8 +45,11 @@ Options options(int argc,char** argv) {
 }
 
 struct State {
+    explicit State(Scene& scene) : scene(scene) {}
+
     Camera camera;
     Rocket rocket;
+    Scene& scene;
     bool padLight=true, captured=false, firstMouse=true;
     double mouseX=0,mouseY=0;
 };
@@ -67,7 +70,12 @@ void onKey(GLFWwindow* window,int key,int,int action,int) {
     auto& app=state(window);
     switch(key) {
         case GLFW_KEY_SPACE: app.rocket.start(); break;
-        case GLFW_KEY_R: app.rocket.reset(); app.camera.home(); app.padLight=true; break;
+        case GLFW_KEY_R:
+            app.rocket.reset();
+            app.camera.home();
+            app.scene.resetExhaust();
+            app.padLight=true;
+            break;
         case GLFW_KEY_H: app.camera.home(); break;
         case GLFW_KEY_L: app.padLight=!app.padLight; break;
         case GLFW_KEY_TAB: captureMouse(window,!app.captured); break;
@@ -121,13 +129,13 @@ void screenshot(const std::string& path,int width,int height) {
 }
 
 void run(GLFWwindow* window,const Options& settings) {
-    State app;
+    Scene scene(settings.shaderDirectory);
+    State app(scene);
     glfwSetWindowUserPointer(window,&app);
     glfwSetKeyCallback(window,onKey);
     glfwSetCursorPosCallback(window,onMouse);
     glfwSetMouseButtonCallback(window,onClick);
     glfwSetWindowFocusCallback(window,onFocus);
-    Scene scene(settings.shaderDirectory);
     Hud hud(settings.shaderDirectory);
     if (settings.simulate>=0) { app.rocket.start(); app.rocket.update(settings.simulate); }
     double last=glfwGetTime(), fpsStart=last, fps=0;
@@ -149,6 +157,7 @@ void run(GLFWwindow* window,const Options& settings) {
         glViewport(0,0,width,height);
         glClearColor(0.65f,0.73f,0.72f,1);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        scene.updateExhaust(app.rocket,dt);
         const auto projection=math3d::perspective(50.0*math3d::pi/180.0,double(width)/height,0.1,600.0);
         scene.render(app.camera.view(),projection,app.camera.position(),app.rocket,app.padLight);
         hud.render(width,height,app.rocket,fps,app.padLight,app.captured);
