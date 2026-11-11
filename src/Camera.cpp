@@ -24,13 +24,14 @@ math3d::vec3 Camera::direction() const {
 }
 
 void Camera::look(double dx, double dy) {
-    if (chasing_) return;
+    if (chasing_ || !std::isfinite(dx) || !std::isfinite(dy)) return;
     yaw_ += dx*0.0025;
     pitch_ = std::max(-1.48, std::min(1.48, pitch_ - dy*0.0025));
 }
 
 void Camera::move(double forward, double right, double vertical, double dt, bool fast) {
-    if (chasing_) return;
+    if (chasing_ || !(dt > 0.0) || !std::isfinite(dt) ||
+        !std::isfinite(forward) || !std::isfinite(right) || !std::isfinite(vertical)) return;
     const auto f = direction();
     const auto r = math3d::normalized(math3d::cross(f, {0,1,0}));
     auto velocity = f*forward + r*right + math3d::vec3{0,vertical,0};

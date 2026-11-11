@@ -78,6 +78,17 @@ void cameraTests() {
     expect(one.position().y>=0.8,"camera cannot descend below ground");
     one.look(1e6,1e6);
     for (float f:one.view()) expect(std::isfinite(f),"extreme mouse input keeps view finite");
+    const auto safePosition = one.position();
+    const auto safeView = one.view();
+    one.move(1,0,0,-1,false);
+    one.move(1,0,0,std::numeric_limits<double>::quiet_NaN(),false);
+    one.move(std::numeric_limits<double>::infinity(),0,0,1,false);
+    one.move(0,std::numeric_limits<double>::quiet_NaN(),0,1,false);
+    expect(one.position().x==safePosition.x && one.position().y==safePosition.y &&
+           one.position().z==safePosition.z,"invalid camera movement is ignored");
+    one.look(std::numeric_limits<double>::quiet_NaN(),0);
+    one.look(0,std::numeric_limits<double>::infinity());
+    expect(one.view()==safeView,"invalid mouse movement is ignored");
     one.home(); Camera initial;
     expect(math3d::length(one.position()-initial.position())<1e-5,"home restores camera");
 
