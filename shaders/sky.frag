@@ -34,6 +34,10 @@ void main() {
 
     float starVisibility = smoothstep(0.35, 0.85, skyDarkness);
 
-    skyColor += vec3(0.9, 0.93, 1.0) * star * starVisibility;
+    float horizonFade = smoothstep(0.3, 0.75, uv.y);
+
+    float finalStarVisibility = starVisibility * horizonFade;
+
+    skyColor += vec3(0.9, 0.93, 1.0) * star * finalStarVisibility;
     fragmentColour = vec4(skyColor, 1.0);
 }
