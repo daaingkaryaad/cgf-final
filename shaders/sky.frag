@@ -32,6 +32,8 @@ void main() {
     float star = step(0.997, randomValue);
     tar *= 1.0 - smoothstep(0.01, 0.045, distanceToStar);
 
-    skyColor += vec3(0.9, 0.93, 1.0) * star;
+    float starVisibility = smoothstep(0.35, 0.85, skyDarkness);
+
+    skyColor += vec3(0.9, 0.93, 1.0) * star * starVisibility;
     fragmentColour = vec4(skyColor, 1.0);
 }
