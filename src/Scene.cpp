@@ -17,6 +17,7 @@ Scene::Scene(const std::string& directory)
     glGenVertexArrays(1,&skyVao_);
     buildSite();
     buildRocket();
+    buildBoosters();
 }
 
 Scene::~Scene() { glDeleteVertexArrays(1,&skyVao_); }
@@ -91,13 +92,16 @@ void Scene::buildRocket() {
     add(rocket_,taper,{0,1.5,0},{1.05,0.9,1.05},steel,0.6f);
     add(rocket_,cylinder,{0,2.05,0},{0.88,0.20,0.88},orange,0.5f);
     add(rocket_,taper,{0,0.62,0},{0.48,0.72,0.48},dark,0.8f);
-    add(booster_,cylinder,{0,3.4,0},{0.52,4.5,0.52},cream,0.65f);
-    add(booster_,cone,{0,6.15,0},{0.52,1.0,0.52},cream,0.65f);
-    add(booster_,taper,{0,0.8,0},{0.68,0.7,0.68},steel,0.55f);
-    add(booster_,cylinder,{0,1.45,0},{0.53,0.32,0.53},orange,0.35f);
-    add(booster_,taper,{0,0.30,0},{0.32,0.42,0.32},dark,0.8f);
-    add(booster_,box,{0.49,1.2,0},{0.65,1.25,0.10},steel,0.45f);
     add(rocket_,box,{0,5.6,0.861},{0.16,2.6,0.025},orange,0.2f);
+}
+
+void Scene::buildBoosters() {
+    add(boosterParts_,cylinder,{0,3.4,0},{0.52,4.5,0.52},cream,0.65f);
+    add(boosterParts_,cone,{0,6.15,0},{0.52,1.0,0.52},cream,0.65f);
+    add(boosterParts_,taper,{0,0.8,0},{0.68,0.7,0.68},steel,0.55f);
+    add(boosterParts_,cylinder,{0,1.45,0},{0.53,0.32,0.53},orange,0.35f);
+    add(boosterParts_,taper,{0,0.30,0},{0.32,0.42,0.32},dark,0.8f);
+    add(boosterParts_,box,{0.49,1.2,0},{0.65,1.25,0.10},steel,0.45f);
 }
 
 void Scene::draw(const Part& part, const math3d::mat4& parent) {
@@ -107,6 +111,19 @@ void Scene::draw(const Part& part, const math3d::mat4& parent) {
     shader_.scalar("textureRepeat",part.textureRepeat);
     shader_.integer("emissive",part.emissive ? 1 : 0);
     meshes_[part.shape]->draw();
+}
+
+void Scene::drawBoosters(const Rocket& rocket) {
+    if (!rocket.boostersVisible()) return;
+    const bool showGlow = rocket.enginesOn() && !rocket.boostersSeparated();
+    static const Part nozzleGlow{cylinder,math3d::transform({0,0.08,0},{0.27,0.018,0.27}),
+                                 {1,0.55,0.12},0,0,true};
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        // Rocket supplies a world pose in both states. Apply only the part's local transform.
+        const auto model = rocket.boosterModel(i);
+        for (const auto& part : boosterParts_) draw(part,model);
+        if (showGlow) draw(nozzleGlow,model);
+    }
 }
 
 void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
@@ -131,12 +148,7 @@ void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
     for (const auto& part : site_) draw(part,identity);
     const auto coreModel = rocket.model();
     for (const auto& part : rocket_) draw(part,coreModel);
-    if (rocket.boostersVisible()) {
-        for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
-            const auto model = rocket.boosterModel(i);
-            for (const auto& part : booster_) draw(part,model);
-        }
-    }
+    drawBoosters(rocket);
     Part lens{box,math3d::transform({8,7.1,4.74},{0.85,0.3,0.03}),
         padLight ? vec3{1,0.82,0.40} : vec3{0.2,0.21,0.18},0.1f,0,padLight};
     draw(lens,identity);
@@ -144,11 +156,5 @@ void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
         Part coreNozzle{cylinder,math3d::transform({0,0.263,0},{0.39,0.018,0.39}),
                         {1,0.55,0.12},0,0,true};
         draw(coreNozzle,coreModel);
-        if (!rocket.boostersSeparated()) {
-            Part boosterNozzle{cylinder,math3d::transform({0,0.08,0},{0.27,0.018,0.27}),
-                               {1,0.55,0.12},0,0,true};
-            for (std::size_t i=0; i<Rocket::boosterCount; ++i)
-                draw(boosterNozzle,rocket.boosterModel(i));
-        }
     }
 }
