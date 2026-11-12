@@ -1,6 +1,7 @@
 #include "Camera.h"
 #include "Geometry.h"
 #include "Rocket.h"
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -58,34 +59,65 @@ void boosterTests() {
     using namespace math3d;
     const double separation = 4.2+std::sqrt(2.0*54.0/1.1);
     const vec3 pivot{0,3.2,0};
+    const std::array<vec3,Rocket::boosterCount> directions{{
+        {1,0,0}, {0,0,1}, {-1,0,0}, {0,0,-1}
+    }};
     Rocket rocket;
-    const auto initial = rocket.boosterModel(0);
+    std::array<mat4,Rocket::boosterCount> initial;
+    std::array<vec3,Rocket::boosterCount> before;
+    expect(!rocket.boostersSeparated() && rocket.boostersVisible(),"boosters are attached and visible on the pad");
+    const auto pad = transform_point(rocket.model(),pivot);
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        initial[i] = rocket.boosterModel(i);
+        const auto center = transform_point(initial[i],pivot);
+        expect(length(center-pad-directions[i]*1.38)<1e-5,"each booster sits at its cardinal mounting point");
+        const auto fin = transform_point(initial[i],pivot+vec3{1,0,0});
+        expect(length(fin-center-directions[i])<1e-5,"each booster's local positive x points outward");
+    }
     rocket.start();
     rocket.update(separation-0.001);
-    const auto before = transform_point(rocket.boosterModel(0),pivot);
     expect(!rocket.boostersSeparated() && rocket.boostersVisible(),"boosters stay attached below separation altitude");
-    expect(close(before.y,transform_point(initial,pivot).y+rocket.altitude()),"attached booster follows core altitude");
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        before[i] = transform_point(rocket.boosterModel(i),pivot);
+        const auto expected = transform_point(initial[i],pivot)+vec3{0,rocket.altitude(),0};
+        expect(length(before[i]-expected)<1e-5,"all attached boosters follow the core");
+    }
     rocket.update(0.002);
     expect(rocket.boostersSeparated(),"boosters separate at 54 scene units");
-    expect(length(transform_point(rocket.boosterModel(0),pivot)-before)<0.03,"separation preserves the attached pose");
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+        expect(length(transform_point(rocket.boosterModel(i),pivot)-before[i])<0.03,
+               "separation preserves each booster's center");
     rocket.update(0.8);
     const auto drifting = transform_point(rocket.boosterModel(0),pivot);
-    const auto opposite = transform_point(rocket.boosterModel(2),pivot);
-    expect(drifting.x>before.x+3 && opposite.x<-3,"opposite boosters drift apart");
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        const auto center = transform_point(rocket.boosterModel(i),pivot);
+        expect(dot(center-before[i],directions[i])>3,"each booster drifts away from the core");
+    }
     expect(std::abs(transform_point(rocket.boosterModel(0),{0,5.8,0}).x-drifting.x)>1,
            "detached booster tumbles around its center");
     rocket.update(1.7);
     expect(transform_point(rocket.boosterModel(0),pivot).y<drifting.y,"detached booster falls while core rises");
     rocket.update(0.6);
     expect(rocket.stage()==Rocket::Stage::complete && rocket.boostersVisible(),"boosters keep falling after ascent ends");
-    rocket.update(1.1);
+    const auto atCoreStop = transform_point(rocket.boosterModel(0),pivot);
+    rocket.update(0.9);
+    expect(rocket.boostersSeparated() && rocket.boostersVisible(),"boosters stay detached during the final fall");
+    expect(transform_point(rocket.boosterModel(0),pivot).y<atCoreStop.y && close(rocket.altitude(),90),
+           "booster motion continues while the core is stationary");
+    rocket.update(0.2);
     expect(!rocket.boostersVisible(),"boosters leave the scene after falling below the terrain");
     rocket.reset();
-    expect(!rocket.boostersSeparated() && rocket.boostersVisible() && rocket.boosterModel(0)==initial,
-           "reset reattaches boosters to the starting rocket");
+    expect(!rocket.boostersSeparated() && rocket.boostersVisible(),"reset restores attached booster visibility");
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+        expect(rocket.boosterModel(i)==initial[i],"reset restores each booster's pad transform");
     rocket.start();
     rocket.update(separation+0.3);
     expect(rocket.boostersSeparated() && rocket.boostersVisible(),"relaunch separates boosters again");
+    Rocket fresh;
+    fresh.start();
+    fresh.update(separation+0.3);
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+        expect(rocket.boosterModel(i)==fresh.boosterModel(i),"relaunch does not retain previous booster motion");
 }
 
 void transformTests() {
