@@ -119,6 +119,10 @@ void cameraTests() {
     expect(vibration>0.01 && vibration<0.4,"ignition shake adds a small visible offset");
     one.updateIgnitionShake(true,1.0);
     expect(math3d::length(one.position()-rest)<vibration,"ignition shake fades during ignition");
+    one.updateIgnitionShake(true,std::numeric_limits<double>::max());
+    expect(one.view()==initial.view(),"extreme ignition duration settles the camera");
+    one.updateIgnitionShake(true,0.1);
+    expect(one.view()==initial.view(),"settled shake does not restart until reset");
     one.updateIgnitionShake(false,0.02);
     expect(one.view()==initial.view(),"leaving ignition clears shake without camera drift");
 

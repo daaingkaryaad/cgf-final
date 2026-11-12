@@ -63,7 +63,14 @@ void Camera::updateIgnitionShake(bool igniting, double dt) {
         return;
     }
     if (dt <= 0.0 || !std::isfinite(dt)) return;
-    shakeTime_ += dt;
+    // Beyond this duration the vibration is negligible. Saturation also
+    // prevents huge elapsed times from overflowing the oscillator phase.
+    constexpr double shakeDuration = 5.0;
+    shakeTime_ = std::min(shakeDuration, shakeTime_ + std::min(dt, shakeDuration));
+    if (shakeTime_ >= shakeDuration) {
+        shakeOffset_ = {0,0,0};
+        return;
+    }
     // ramp in briefly, then let the vibration decay during ignition.
     const double ramp = std::min(1.0,shakeTime_ / 0.08);
     const double strength = 0.26 * ramp * std::exp(-3.5 * shakeTime_);
