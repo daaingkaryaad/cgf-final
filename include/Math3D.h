@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 
 namespace math3d {
@@ -77,6 +78,12 @@ inline mat4 look_at(const vec3& eye, const vec3& target, const vec3& up) {
     return result;
 }
 
+inline float projection_value(double value) {
+    if (!std::isfinite(value) || std::abs(value) > std::numeric_limits<float>::max())
+        throw std::runtime_error("projection coefficient exceeds float range");
+    return static_cast<float>(value);
+}
+
 inline mat4 perspective(double fovy, double aspect, double near_z, double far_z) {
     if (!std::isfinite(fovy) || !std::isfinite(aspect) ||
         !std::isfinite(near_z) || !std::isfinite(far_z) ||
@@ -84,11 +91,11 @@ inline mat4 perspective(double fovy, double aspect, double near_z, double far_z)
         throw std::runtime_error("invalid perspective parameters");
     const double f = 1.0 / std::tan(fovy * 0.5);
     mat4 result{};
-    result[0] = static_cast<float>(f / aspect);
-    result[5] = static_cast<float>(f);
-    result[10] = static_cast<float>((far_z + near_z) / (near_z - far_z));
+    result[0] = projection_value(f / aspect);
+    result[5] = projection_value(f);
+    result[10] = projection_value(-1.0 - 2.0 * (near_z / (far_z - near_z)));
     result[11] = -1.0f;
-    result[14] = static_cast<float>(2.0 * far_z * near_z / (near_z - far_z));
+    result[14] = projection_value(-2.0 * (near_z / (far_z - near_z)) * far_z);
     return result;
 }
 
@@ -99,13 +106,15 @@ inline mat4 orthographic(double left, double right, double bottom, double top,
         !std::isfinite(near_z) || !std::isfinite(far_z) ||
         !(right > left && top > bottom && near_z > 0 && far_z > near_z))
         throw std::runtime_error("invalid orthographic parameters");
+    if (!std::isfinite(right-left) || !std::isfinite(top-bottom))
+        throw std::runtime_error("orthographic extent exceeds double range");
     mat4 result = identity();
-    result[0] = static_cast<float>(2.0 / (right - left));
-    result[5] = static_cast<float>(2.0 / (top - bottom));
-    result[10] = static_cast<float>(-2.0 / (far_z - near_z));
-    result[12] = static_cast<float>(-(right + left) / (right - left));
-    result[13] = static_cast<float>(-(top + bottom) / (top - bottom));
-    result[14] = static_cast<float>(-(far_z + near_z) / (far_z - near_z));
+    result[0] = projection_value(2.0 / (right - left));
+    result[5] = projection_value(2.0 / (top - bottom));
+    result[10] = projection_value(-2.0 / (far_z - near_z));
+    result[12] = projection_value(-(right / (right - left) + left / (right - left)));
+    result[13] = projection_value(-(top / (top - bottom) + bottom / (top - bottom)));
+    result[14] = projection_value(-1.0 - 2.0 * (near_z / (far_z - near_z)));
     return result;
 }
 

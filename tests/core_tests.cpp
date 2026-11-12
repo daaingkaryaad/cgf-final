@@ -82,6 +82,10 @@ void projectionTests() {
         try { function(); } catch (const std::runtime_error&) { return true; }
         return false;
     };
+    expect(invalid([&]{ perspective(pi/3,1e-100,0.1,100); }),"perspective rejects float overflow");
+    expect(invalid([&]{ orthographic(0,1e-100,-5,5,0.1,100); }),"orthographic rejects float overflow");
+    const auto distant = perspective(pi/3,1,0.1,std::numeric_limits<double>::max());
+    expect(close(distant[10],-1) && close(distant[14],-0.2),"large far plane avoids intermediate overflow");
     expect(invalid([&]{ perspective(nan,1,0.1,100); }),"perspective rejects NaN angle");
     expect(invalid([&]{ perspective(pi/3,infinity,0.1,100); }),"perspective rejects infinite aspect");
     expect(invalid([&]{ perspective(pi/3,1,0.1,infinity); }),"perspective rejects infinite far plane");
