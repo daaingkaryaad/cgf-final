@@ -4,6 +4,8 @@
 
 namespace {
 constexpr double padHeight = 0.65;
+constexpr double countdownDuration = 3.0;
+constexpr double ignitionEnd = countdownDuration+1.2;
 constexpr double ascentAcceleration = 1.1;
 constexpr double maximumAltitude = 90.0;
 constexpr double separationHeight = 54.0;
@@ -11,6 +13,9 @@ constexpr double boosterOffset = 1.38;
 constexpr double boosterPivot = 3.2;
 constexpr double boosterFallTime = 4.1;
 const double separationTime = std::sqrt(2.0*separationHeight/ascentAcceleration);
+const double separationAt = ignitionEnd+separationTime;
+const double coreStopsAt = ignitionEnd+std::sqrt(2.0*maximumAltitude/ascentAcceleration);
+const double boostersHideAt = separationAt+boosterFallTime;
 
 math3d::mat4 rotationZ(double angle) {
     auto m = math3d::identity();
@@ -22,40 +27,37 @@ math3d::mat4 rotationZ(double angle) {
 }
 
 void Rocket::start() {
-    if (stage_ == Stage::ready) { stage_ = Stage::countdown; elapsed_ = 0.0; }
+    if (stage_ == Stage::ready) stage_ = Stage::countdown;
 }
 
 void Rocket::reset() {
     stage_ = Stage::ready;
-    elapsed_ = altitude_ = velocity_ = 0.0;
+    launchElapsed_ = altitude_ = velocity_ = 0.0;
 }
 
 void Rocket::update(double dt) {
-    if (dt <= 0.0 || !std::isfinite(dt)) return;
-    while (dt > 0.0) {
-        if (stage_ == Stage::ready) return;
-        if (stage_ == Stage::countdown || stage_ == Stage::ignition) {
-            const double duration = stage_ == Stage::countdown ? 3.0 : 1.2;
-            const double step = std::min(dt, duration - elapsed_);
-            elapsed_ += step;
-            dt -= step;
-            if (elapsed_ >= duration) {
-                stage_ = stage_ == Stage::countdown ? Stage::ignition : Stage::ascent;
-                elapsed_ = 0.0;
-            }
-        } else {
-            // the boosters can still be falling after the core stops ascending.
-            elapsed_ = std::min(elapsed_+dt,separationTime+boosterFallTime);
-            altitude_ = std::min(maximumAltitude,0.5*ascentAcceleration*elapsed_*elapsed_);
-            velocity_ = ascentAcceleration*elapsed_;
-            if (altitude_ >= maximumAltitude) { stage_ = Stage::complete; velocity_ = 0.0; }
-            return;
-        }
+    if (stage_ == Stage::ready || dt <= 0.0 || !std::isfinite(dt)) return;
+    // Use one clock for event boundaries; keep it running after the core stops.
+    const double remaining = boostersHideAt-launchElapsed_;
+    launchElapsed_ = dt >= remaining ? boostersHideAt : launchElapsed_+dt;
+    if (launchElapsed_ < countdownDuration) {
+        stage_ = Stage::countdown;
+    } else if (launchElapsed_ < ignitionEnd) {
+        stage_ = Stage::ignition;
+    } else if (launchElapsed_ < coreStopsAt) {
+        stage_ = Stage::ascent;
+        const double ascentTime = launchElapsed_-ignitionEnd;
+        altitude_ = 0.5*ascentAcceleration*ascentTime*ascentTime;
+        velocity_ = ascentAcceleration*ascentTime;
+    } else {
+        stage_ = Stage::complete;
+        altitude_ = maximumAltitude;
+        velocity_ = 0.0;
     }
 }
 
 int Rocket::countdown() const {
-    return stage_ == Stage::countdown ? std::max(1, int(std::ceil(3.0-elapsed_))) : 0;
+    return stage_ == Stage::countdown ? int(std::ceil(countdownDuration-launchElapsed_)) : 0;
 }
 
 bool Rocket::enginesOn() const {
@@ -67,11 +69,11 @@ math3d::mat4 Rocket::model() const {
 }
 
 bool Rocket::boostersSeparated() const {
-    return altitude_ >= separationHeight;
+    return launchElapsed_ >= separationAt;
 }
 
 bool Rocket::boostersVisible() const {
-    return !boostersSeparated() || elapsed_ < separationTime+boosterFallTime;
+    return launchElapsed_ < boostersHideAt;
 }
 
 math3d::mat4 Rocket::boosterModel(std::size_t index) const {
@@ -84,7 +86,7 @@ math3d::mat4 Rocket::boosterModel(std::size_t index) const {
     }
 
     // start at the attached pose, then drift and tumble around the booster center.
-    const double age = std::max(0.0,elapsed_-separationTime);
+    const double age = launchElapsed_-separationAt;
     const double height = padHeight+separationHeight+boosterPivot
                         + ascentAcceleration*separationTime*age-7.0*age*age;
     const vec3 center = outward*(boosterOffset+4.5*age)+vec3{0,height,0};

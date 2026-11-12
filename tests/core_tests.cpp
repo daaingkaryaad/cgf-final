@@ -120,6 +120,39 @@ void boosterTests() {
         expect(rocket.boosterModel(i)==fresh.boosterModel(i),"relaunch does not retain previous booster motion");
 }
 
+void boosterTimingTests() {
+    using namespace math3d;
+    const double release = 4.2+std::sqrt(2.0*54.0/1.1);
+    const double justBefore = std::nextafter(release,0.0);
+    Rocket boundary;
+    boundary.start();
+    boundary.update(justBefore);
+    expect(!boundary.boostersSeparated(),"a coarse update just below the threshold does not separate boosters");
+    std::array<mat4,Rocket::boosterCount> attached;
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) attached[i] = boundary.boosterModel(i);
+    boundary.update(release-justBefore);
+    expect(boundary.boostersSeparated() && close(boundary.altitude(),54),"boosters separate at the exact launch time");
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        for (const vec3 point : {vec3{0,0,0}, vec3{0,6.65,0}, vec3{0.8,1.2,0}})
+            expect(length(transform_point(boundary.boosterModel(i),point)-transform_point(attached[i],point))<1e-5,
+                   "the base, tip and fin have no pose jump at release");
+    }
+
+    Rocket oneStep;
+    oneStep.start();
+    oneStep.update(release+3.5);
+    boundary.update(3.5);
+    expect(oneStep.stage()==Rocket::Stage::complete && oneStep.boostersSeparated() && oneStep.boostersVisible(),
+           "a single long update can reach a stationary core with falling boosters");
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+        expect(length(transform_point(oneStep.boosterModel(i),{0,6.65,0})-
+                      transform_point(boundary.boosterModel(i),{0,6.65,0}))<1e-5,
+               "a long update consumes only the time after release for booster motion");
+    oneStep.update(std::numeric_limits<double>::max());
+    expect(oneStep.boostersSeparated() && !oneStep.boostersVisible() && close(oneStep.altitude(),90),
+           "a huge finite update finishes booster flight without changing core altitude");
+}
+
 void transformTests() {
     using namespace math3d;
     const vec3 localPoint{0.4,1,0};
@@ -168,7 +201,7 @@ void meshTest(const MeshData& mesh) {
 
 int main() {
     try {
-        launchTests(); boosterTests(); transformTests(); cameraTests();
+        launchTests(); boosterTests(); boosterTimingTests(); transformTests(); cameraTests();
         meshTest(geometry::box()); meshTest(geometry::plane());
         meshTest(geometry::frustum(1)); meshTest(geometry::frustum(0)); meshTest(geometry::frustum(0.58f));
         std::cout<<checks<<" checks passed: launch, hierarchy, camera, geometry\n";

@@ -21,5 +21,5 @@ public:
     math3d::mat4 boosterModel(std::size_t index) const;
 private:
     Stage stage_ = Stage::ready;
-    double elapsed_ = 0.0, altitude_ = 0.0, velocity_ = 0.0;
+    double launchElapsed_ = 0.0, altitude_ = 0.0, velocity_ = 0.0;
 };
