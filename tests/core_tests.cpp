@@ -85,7 +85,13 @@ void cameraTests() {
     one.look(70,-20);
     const auto freeView = one.view();
     const math3d::vec3 onPad{0,6,0}, ascending{0,26,0};
+    const math3d::vec3 invalidTarget{0,std::numeric_limits<double>::quiet_NaN(),0};
+    one.toggleChase(invalidTarget);
+    expect(!one.chasing() && one.view()==freeView,"invalid chase entry is ignored");
     one.toggleChase(onPad);
+    const auto validChaseView = one.view();
+    one.follow(invalidTarget,0.2);
+    expect(one.view()==validChaseView,"invalid tracking target is ignored");
     const auto initialChasePosition = one.position();
     const auto centered = math3d::transform_point(one.view(), onPad);
     expect(one.chasing() && close(centered.x,0) && close(centered.y,0) && centered.z<0,

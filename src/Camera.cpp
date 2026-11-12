@@ -5,6 +5,9 @@
 namespace {
 constexpr math3d::vec3 chaseOffset{14.0, 6.0, 21.0};
 constexpr double chaseResponse = 5.0;
+bool finiteTarget(const math3d::vec3& target) {
+    return std::isfinite(target.x) && std::isfinite(target.y) && std::isfinite(target.z);
+}
 }
 
 Camera::Camera() { home(); }
@@ -41,12 +44,13 @@ void Camera::move(double forward, double right, double vertical, double dt, bool
 }
 
 void Camera::toggleChase(const math3d::vec3& target) {
+    if (!chasing_ && !finiteTarget(target)) return;
     chasing_ = !chasing_;
     if (chasing_) chaseTarget_ = target;
 }
 
 void Camera::follow(const math3d::vec3& target, double dt) {
-    if (!chasing_ || dt <= 0.0 || !std::isfinite(dt)) return;
+    if (!chasing_ || dt <= 0.0 || !std::isfinite(dt) || !finiteTarget(target)) return;
     // exponential smoothing gives the same response across frame intervals.
     const double blend = -std::expm1(-chaseResponse * dt);
     chaseTarget_ = chaseTarget_ + (target - chaseTarget_) * blend;
