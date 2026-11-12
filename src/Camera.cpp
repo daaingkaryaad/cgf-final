@@ -25,19 +25,27 @@ math3d::vec3 Camera::direction() const {
 
 void Camera::look(double dx, double dy) {
     if (chasing_ || !std::isfinite(dx) || !std::isfinite(dy)) return;
-    yaw_ += dx*0.0025;
+    const double turn = 2.0 * math3d::pi;
+    yaw_ = std::remainder(yaw_ + std::remainder(dx*0.0025, turn), turn);
     pitch_ = std::max(-1.48, std::min(1.48, pitch_ - dy*0.0025));
 }
 
 void Camera::move(double forward, double right, double vertical, double dt, bool fast) {
     if (chasing_ || !(dt > 0.0) || !std::isfinite(dt) ||
         !std::isfinite(forward) || !std::isfinite(right) || !std::isfinite(vertical)) return;
+    // Inputs are signed movement axes, not arbitrary velocities.
+    const auto axis = [](double value) { return std::max(-1.0, std::min(1.0, value)); };
+    forward = axis(forward);
+    right = axis(right);
+    vertical = axis(vertical);
     const auto f = direction();
     const auto r = math3d::normalized(math3d::cross(f, {0,1,0}));
     auto velocity = f*forward + r*right + math3d::vec3{0,vertical,0};
     const double magnitude = math3d::length(velocity);
     if (magnitude > 1.0) velocity = velocity / magnitude;
-    position_ = position_ + velocity*(dt*(fast ? 24.0 : 9.0));
+    const auto next = position_ + velocity*(dt*(fast ? 24.0 : 9.0));
+    if (!std::isfinite(next.x) || !std::isfinite(next.y) || !std::isfinite(next.z)) return;
+    position_ = next;
     position_.y = std::max(0.8, position_.y);
 }
 

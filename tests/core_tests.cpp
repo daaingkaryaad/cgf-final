@@ -110,6 +110,17 @@ void cameraTests() {
     one.look(std::numeric_limits<double>::quiet_NaN(),0);
     one.look(0,std::numeric_limits<double>::infinity());
     expect(one.view()==safeView,"invalid mouse movement is ignored");
+    Camera huge, bounded;
+    huge.move(std::numeric_limits<double>::max(),0,0,0.1,false);
+    bounded.move(1,0,0,0.1,false);
+    expect(math3d::length(huge.position()-bounded.position())<1e-5,"movement axes are bounded");
+    const auto beforeOverflow = huge.position();
+    huge.move(1,0,0,std::numeric_limits<double>::max(),true);
+    expect(math3d::length(huge.position()-beforeOverflow)<1e-5,"overflowing movement is ignored");
+    huge.look(std::numeric_limits<double>::max(),0);
+    const auto hugeView = huge.view();
+    huge.look(100,0);
+    expect(huge.view()!=hugeView,"mouse remains responsive after huge yaw input");
     one.home(); Camera initial;
     expect(math3d::length(one.position()-initial.position())<1e-5,"home restores camera");
 
