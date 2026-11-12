@@ -1,5 +1,4 @@
 #include "Rocket.h"
-#include <algorithm>
 #include <cmath>
 
 namespace {
@@ -12,6 +11,11 @@ constexpr double separationHeight = 54.0;
 constexpr double boosterOffset = 1.38;
 constexpr double boosterPivot = 3.2;
 constexpr double boosterFallTime = 4.1;
+constexpr double boosterGravity = 14.0;
+constexpr double releaseRamp = 0.12;
+constexpr double driftSpeed = 4.5;
+constexpr double tumbleSpeed = 1.25;
+constexpr double spinSpeed = 0.32;
 const double separationTime = std::sqrt(2.0*separationHeight/ascentAcceleration);
 const double separationAt = ignitionEnd+separationTime;
 const double coreStopsAt = ignitionEnd+std::sqrt(2.0*maximumAltitude/ascentAcceleration);
@@ -85,12 +89,13 @@ math3d::mat4 Rocket::boosterModel(std::size_t index) const {
         return multiply(model(),multiply(translation(outward*boosterOffset),facing));
     }
 
-    // start at the attached pose, then drift and tumble around the booster center.
+    // Radial and angular speeds start at zero and ease toward their steady rates.
     const double age = launchElapsed_-separationAt;
+    const double easedAge = age*age/(age+releaseRamp);
     const double height = padHeight+separationHeight+boosterPivot
-                        + ascentAcceleration*separationTime*age-7.0*age*age;
-    const vec3 center = outward*(boosterOffset+4.5*age)+vec3{0,height,0};
-    const auto tumble = rotationZ(-age*(1.15+0.14*index));
+                        + ascentAcceleration*separationTime*age-0.5*boosterGravity*age*age;
+    const vec3 center = outward*(boosterOffset+driftSpeed*easedAge)+vec3{0,height,0};
+    const auto tumble = multiply(rotationZ(-tumbleSpeed*easedAge),rotation_y(spinSpeed*easedAge));
     return multiply(translation(center),
                     multiply(facing,multiply(tumble,translation({0,-boosterPivot,0}))));
 }

@@ -153,6 +153,56 @@ void boosterTimingTests() {
            "a huge finite update finishes booster flight without changing core altitude");
 }
 
+void boosterMotionTests() {
+    using namespace math3d;
+    const double release = 4.2+std::sqrt(2.0*54.0/1.1);
+    const vec3 pivot{0,3.2,0}, tip{0,6.65,0}, fin{0.8,1.2,0};
+    Rocket smooth;
+    smooth.start();
+    smooth.update(release);
+    const auto releaseCenter = transform_point(smooth.boosterModel(0),pivot);
+    const auto releaseTip = transform_point(smooth.boosterModel(0),tip)-releaseCenter;
+    smooth.update(0.001);
+    const auto center = transform_point(smooth.boosterModel(0),pivot);
+    expect(center.x>releaseCenter.x && center.x-releaseCenter.x<0.0001,
+           "outward movement eases in from rest");
+    expect(length(transform_point(smooth.boosterModel(0),tip)-center-releaseTip)<0.0001,
+           "tumble eases in from the attached orientation");
+
+    Rocket stepped;
+    stepped.start();
+    stepped.update(release);
+    double previousRadius = releaseCenter.x;
+    for (double age : {0.25, 1.0, 2.0, 3.0, 4.0}) {
+        Rocket coarse;
+        coarse.start();
+        coarse.update(release+age);
+        const auto first = coarse.boosterModel(0);
+        const auto firstCenter = transform_point(first,pivot);
+        expect(firstCenter.x>previousRadius && coarse.boostersVisible(),
+               "the visible boosters move outward without snapping back");
+        previousRadius = firstCenter.x;
+        for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+            const auto quarterTurn = rotation_y(-0.5*pi*i);
+            const auto pose = coarse.boosterModel(i);
+            for (const auto& point : {pivot,tip,fin})
+                expect(length(transform_point(pose,point)-
+                              transform_point(quarterTurn,transform_point(first,point)))<1e-5,
+                       "each booster follows the same motion rotated by its mounting angle");
+        }
+    }
+    for (int frame=0; frame<192; ++frame) stepped.update(1.0/64.0);
+    Rocket coarse;
+    coarse.start();
+    coarse.update(release+3.0);
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        for (const auto& point : {pivot,tip,fin})
+            expect(length(transform_point(stepped.boosterModel(i),point)-
+                          transform_point(coarse.boosterModel(i),point))<1e-5,
+                   "small updates and one coarse update produce the same detached pose");
+    }
+}
+
 void transformTests() {
     using namespace math3d;
     const vec3 localPoint{0.4,1,0};
@@ -201,7 +251,7 @@ void meshTest(const MeshData& mesh) {
 
 int main() {
     try {
-        launchTests(); boosterTests(); boosterTimingTests(); transformTests(); cameraTests();
+        launchTests(); boosterTests(); boosterTimingTests(); boosterMotionTests(); transformTests(); cameraTests();
         meshTest(geometry::box()); meshTest(geometry::plane());
         meshTest(geometry::frustum(1)); meshTest(geometry::frustum(0)); meshTest(geometry::frustum(0.58f));
         std::cout<<checks<<" checks passed: launch, hierarchy, camera, geometry\n";
