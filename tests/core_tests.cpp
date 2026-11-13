@@ -83,6 +83,9 @@ void projectionTests() {
         return false;
     };
     expect(invalid([&]{ perspective(pi/3,1e-100,0.1,100); }),"perspective rejects float overflow");
+    expect(invalid([&]{ perspective(pi/3,1e100,0.1,100); }),"perspective rejects zero horizontal scale");
+    expect(invalid([&]{ orthographic(0,1e100,-5,5,0.1,100); }),"orthographic rejects zero horizontal scale");
+    expect(invalid([&]{ orthographic(-5,5,-5,5,0.1,1e100); }),"orthographic rejects zero depth scale");
     expect(invalid([&]{ orthographic(0,1e-100,-5,5,0.1,100); }),"orthographic rejects float overflow");
     const auto distant = perspective(pi/3,1,0.1,std::numeric_limits<double>::max());
     expect(close(distant[10],-1) && close(distant[14],-0.2),"large far plane avoids intermediate overflow");
