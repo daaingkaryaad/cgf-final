@@ -9,6 +9,11 @@ float starHash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
+float starTwinkle(vec2 cell) {
+    float phase = starHash(cell + vec2(5.0, 9.0)) * 6.2831853;
+    return 0.85 + 0.15 * sin(phase);
+}
+
 void main() {
     vec3 horizon = mix(vec3(0.73,0.77,0.72),darkHorizon,skyDarkness);
     vec3 zenith = mix(vec3(0.28,0.47,0.57),vec3(0.018,0.028,0.065),skyDarkness);
@@ -38,6 +43,8 @@ void main() {
 
     float finalStarVisibility = starVisibility * horizonFade;
 
-    skyColor += vec3(0.9, 0.93, 1.0) * star * finalStarVisibility;
+    float twinkle = starTwinkle(cell);
+    skyColor += vec3(0.9, 0.93, 1.0)
+          * star * finalStarVisibility * twinkle;
     fragmentColour = vec4(skyColor, 1.0);
 }
