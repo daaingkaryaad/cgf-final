@@ -18,10 +18,15 @@ threshold for the detached pose. A very large finite update can cross several
 events at once; nonpositive and nonfinite updates are ignored.
 
 The core stops at 90 scene units at about 17.00 seconds. The boosters keep
-moving until 4.1 seconds after separation (about 18.21 seconds from launch).
-By then they are below the terrain and `boostersVisible()` becomes false.
-Reset clears the clock, returns all four boosters to their pad mounts, and
-allows another launch.
+moving until ground contact at about 17.84 seconds. The simulation finds
+that time once by searching the descending trajectory for where the lowest
+point of the rotated booster envelope reaches the terrain plane at
+`y = -0.025`. The envelope approximates the nozzle, skirt, shell, nose, and
+fin; it does not collide with site props. All four boosters share the same
+contact time because their mounting yaws do not change height.
+`boostersVisible()` becomes false at impact, and the stored pose stops at
+contact even if an update spans the whole descent. Reset returns all four
+boosters to their pad mounts and allows another launch.
 
 ## Model transforms and rendering
 
@@ -61,7 +66,8 @@ so there is no separate render state to reset.
 1. Run `make test`. The booster checks cover all four mount positions and
    fin directions, attachment, exact release and pose continuity, long
    updates, symmetry, smooth and monotonic outward motion, frame partitioning,
-   visibility after core stop, reset, and relaunch.
+   visibility after core stop, terrain contact with fine and coarse updates,
+   reset, and relaunch.
 2. With a C++ compiler, `pkg-config`, GLEW, and GLFW installed, run `make`
    and then `./baikonur` from the repository root.
 3. Press **Space** and watch the attached ascent. Use **E** to rise and
@@ -81,6 +87,7 @@ so there is no separate render state to reset.
    ```
 
 AI assistance disclosure: OpenAI Codex inspected the existing booster
-implementation, made the follow-up code and test changes, ran the build and
-verification commands, and drafted this document. The original booster
+implementation, made the follow-up code and test changes (including the
+terrain-contact timing), ran the build and verification commands, and drafted
+this document. The original booster
 implementation and the rest of the team's project were already present.

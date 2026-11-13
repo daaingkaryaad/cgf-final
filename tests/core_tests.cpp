@@ -100,12 +100,12 @@ void boosterTests() {
     rocket.update(0.6);
     expect(rocket.stage()==Rocket::Stage::complete && rocket.boostersVisible(),"boosters keep falling after ascent ends");
     const auto atCoreStop = transform_point(rocket.boosterModel(0),pivot);
-    rocket.update(0.9);
+    rocket.update(0.6);
     expect(rocket.boostersSeparated() && rocket.boostersVisible(),"boosters stay detached during the final fall");
     expect(transform_point(rocket.boosterModel(0),pivot).y<atCoreStop.y && close(rocket.altitude(),90),
            "booster motion continues while the core is stationary");
-    rocket.update(0.2);
-    expect(!rocket.boostersVisible(),"boosters leave the scene after falling below the terrain");
+    rocket.update(0.5);
+    expect(!rocket.boostersVisible(),"boosters disappear at ground impact");
     rocket.reset();
     expect(!rocket.boostersSeparated() && rocket.boostersVisible(),"reset restores attached booster visibility");
     for (std::size_t i=0; i<Rocket::boosterCount; ++i)
@@ -173,7 +173,7 @@ void boosterMotionTests() {
     stepped.start();
     stepped.update(release);
     double previousRadius = releaseCenter.x;
-    for (double age : {0.25, 1.0, 2.0, 3.0, 4.0}) {
+    for (double age : {0.25, 1.0, 2.0, 3.0, 3.6}) {
         Rocket coarse;
         coarse.start();
         coarse.update(release+age);
@@ -201,6 +201,49 @@ void boosterMotionTests() {
                           transform_point(coarse.boosterModel(i),point))<1e-5,
                    "small updates and one coarse update produce the same detached pose");
     }
+}
+
+void boosterImpactTests() {
+    using namespace math3d;
+    const double release = 4.2+std::sqrt(2.0*54.0/1.1);
+    Rocket fine;
+    fine.start();
+    fine.update(release+3.65);
+    expect(fine.boostersSeparated() && fine.boostersVisible() && fine.stage()==Rocket::Stage::complete,
+           "boosters remain visible on final approach after the core stops");
+    double age = 3.65;
+    while (fine.boostersVisible() && age<3.8) {
+        age += 0.001;
+        fine.update(0.001);
+    }
+    expect(!fine.boostersVisible(),"boosters disappear at terrain contact before the old cutoff");
+
+    Rocket coarse;
+    coarse.start();
+    coarse.update(release+age+1.0);
+    expect(coarse.boostersSeparated() && !coarse.boostersVisible() &&
+           coarse.stage()==Rocket::Stage::complete && close(coarse.altitude(),90) && close(coarse.velocity(),0),
+           "an update spanning impact leaves the finished core intact");
+    const auto groundRim = [](const mat4& pose) {
+        // Near contact the tilted upper shell rim is the lowest part of the booster.
+        return transform_point(pose,{0,5.65,0}).y-0.52*std::hypot(pose[1],pose[9]);
+    };
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        const auto impact = fine.boosterModel(i);
+        const double clearance = groundRim(impact)-(-0.025);
+        expect(clearance>=-1e-5 && clearance<0.1,"the tilted booster reaches the terrain without sinking below it");
+        expect(impact==coarse.boosterModel(i),"small and large updates retain the same impact pose");
+    }
+    fine.start();
+    fine.update(1.0);
+    expect(!fine.boostersVisible(),"impacted boosters stay hidden until reset");
+    fine.reset();
+    expect(fine.boostersVisible() && !fine.boostersSeparated(),"reset clears the impacted state");
+    fine.start();
+    fine.update(release+3.65);
+    expect(fine.boostersVisible(),"relaunch restores the full descent before the next impact");
+    fine.update(0.15);
+    expect(!fine.boostersVisible(),"relaunch reaches ground impact again");
 }
 
 void transformTests() {
@@ -251,7 +294,8 @@ void meshTest(const MeshData& mesh) {
 
 int main() {
     try {
-        launchTests(); boosterTests(); boosterTimingTests(); boosterMotionTests(); transformTests(); cameraTests();
+        launchTests(); boosterTests(); boosterTimingTests(); boosterMotionTests(); boosterImpactTests();
+        transformTests(); cameraTests();
         meshTest(geometry::box()); meshTest(geometry::plane());
         meshTest(geometry::frustum(1)); meshTest(geometry::frustum(0)); meshTest(geometry::frustum(0.58f));
         std::cout<<checks<<" checks passed: launch, hierarchy, camera, geometry\n";
