@@ -103,6 +103,20 @@ void cameraTests() {
     for (int i=0; i<20; ++i) many.follow(ascending,0.01);
     expect(math3d::length(one.position()-many.position())<1e-5,
            "chase smoothing uses elapsed time");
+    Camera extreme;
+    const double large = std::numeric_limits<double>::max();
+    extreme.toggleChase({large,0,0});
+    extreme.follow({-large,0,0},0.1);
+    expect(std::isfinite(extreme.position().x),"opposite large targets do not overflow interpolation");
+    extreme.follow(onPad,1000.0);
+    expect(math3d::length(extreme.position()-math3d::vec3{14,12,21})<1e-5,
+           "tracking recovers from extreme finite targets");
+    Camera snap;
+    snap.toggleChase(onPad);
+    snap.follow(ascending,1000.0);
+    Camera direct;
+    direct.toggleChase(ascending);
+    expect(snap.view()==direct.view(),"long tracking interval reaches the target");
     one.move(1,1,1,0.5,true);
     one.look(60,30);
     one.toggleChase(ascending);

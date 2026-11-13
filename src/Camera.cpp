@@ -53,7 +53,9 @@ void Camera::follow(const math3d::vec3& target, double dt) {
     if (!chasing_ || dt <= 0.0 || !std::isfinite(dt) || !finiteTarget(target)) return;
     // exponential smoothing gives the same response across frame intervals.
     const double blend = -std::expm1(-chaseResponse * dt);
-    chaseTarget_ = chaseTarget_ + (target - chaseTarget_) * blend;
+    // A convex combination avoids overflowing the difference between targets.
+    const auto next = chaseTarget_ * (1.0 - blend) + target * blend;
+    if (finiteTarget(next)) chaseTarget_ = next;
 }
 
 void Camera::updateIgnitionShake(bool igniting, double dt) {
