@@ -144,6 +144,9 @@ void cameraTests() {
     const auto steadyChase = one.view();
     one.updateIgnitionShake(true,0.08);
     expect(one.view()!=steadyChase,"ignition shake also works in chase mode");
+    const auto shakenCenter = math3d::transform_point(one.view(),onPad);
+    expect(close(shakenCenter.x,0) && close(shakenCenter.y,0) && shakenCenter.z<0,
+           "shake keeps the tracked rocket centered");
     one.home();
     expect(!one.chasing() && one.view()==initial.view(),"reset clears ignition shake and chase mode");
 }

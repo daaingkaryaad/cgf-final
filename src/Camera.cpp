@@ -88,6 +88,7 @@ math3d::vec3 Camera::position() const {
 
 math3d::mat4 Camera::view() const {
     const auto eye = position();
-    const auto target = chasing_ ? chaseTarget_ + shakeOffset_ : eye + direction();
+    // Keep the tracked rocket centered when the camera position vibrates.
+    const auto target = chasing_ ? chaseTarget_ : eye + direction();
     return math3d::look_at(eye, target, {0,1,0});
 }
