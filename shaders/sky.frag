@@ -44,7 +44,13 @@ void main() {
     float finalStarVisibility = starVisibility * horizonFade;
 
     float twinkle = starTwinkle(cell);
+
+    float brightness = mix(
+        0.45,
+        1.0,
+        starHash(cell + vec2(17.0, 23.0))
+    );
     skyColor += vec3(0.9, 0.93, 1.0)
-          * star * finalStarVisibility * twinkle;
+        * star * finalStarVisibility * twinkle * brightness;
     fragmentColour = vec4(skyColor, 1.0);
 }
