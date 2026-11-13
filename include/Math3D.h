@@ -60,7 +60,15 @@ inline mat4 multiply(const mat4& a, const mat4& b) {
 
 inline mat4 look_at(const vec3& eye, const vec3& target, const vec3& up) {
     const vec3 forward = normalized(target - eye);
-    const vec3 right = normalized(cross(forward, up));
+    // Normalize the up hint before testing alignment, so its magnitude
+    // does not affect the camera basis. Choose a fallback at the poles.
+    const vec3 up_hint = normalized(up);
+    vec3 side = cross(forward, up_hint);
+    if (length(side) < 1e-8) {
+        const vec3 fallback = std::abs(forward.y) < 0.9 ? vec3{0,1,0} : vec3{1,0,0};
+        side = cross(forward, fallback);
+    }
+    const vec3 right = normalized(side);
     const vec3 camera_up = cross(right, forward);
     mat4 result = identity();
     result[0] = static_cast<float>(right.x);
