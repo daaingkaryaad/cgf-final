@@ -100,8 +100,12 @@ void Scene::buildBoosters() {
     add(boosterParts_,cone,{0,6.15,0},{0.52,1.0,0.52},cream,0.65f);
     add(boosterParts_,taper,{0,0.8,0},{0.68,0.7,0.68},steel,0.55f);
     add(boosterParts_,cylinder,{0,1.45,0},{0.53,0.32,0.53},orange,0.35f);
+    add(boosterParts_,cylinder,{0,5.54,0},{0.58,0.20,0.58},orange,0.35f);
     add(boosterParts_,taper,{0,0.30,0},{0.32,0.42,0.32},dark,0.8f);
     add(boosterParts_,box,{0.49,1.2,0},{0.65,1.25,0.10},steel,0.45f);
+    // Local -X faces the core. These lugs overlap the shell and remain with it after release.
+    for (double height : {2.45,5.3})
+        add(boosterParts_,box,{-0.50,height,0},{0.14,0.24,0.20},dark,0.45f);
 }
 
 void Scene::draw(const Part& part, const math3d::mat4& parent) {

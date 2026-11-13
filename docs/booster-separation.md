@@ -53,8 +53,12 @@ formulas agree. All four boosters use the same motion rotated to their
 respective mounting angles.
 
 `Scene::buildBoosters()` defines one assembly of lit parts, separate from the
-core geometry. `Scene::drawBoosters()` draws four instances, multiplying each
-booster's world matrix by each part's local matrix. The existing shader uses
+core geometry. An upper orange band pairs with the lower band, and two dark
+lugs on the inward side bridge each booster shell to the core while attached.
+The bands, fin, and lugs all stay with the booster on release. The new parts
+reuse the cylinder and box meshes and fit inside the contact envelope.
+`Scene::drawBoosters()` draws four instances, multiplying each booster's
+world matrix by each part's local matrix. The existing shader uses
 that model matrix for positions and its inverse transpose for normals. The
 emissive nozzle glow uses the same booster pose while the engine is on and
 the booster is attached; the physical nozzle remains part of the detached
@@ -75,19 +79,20 @@ so there is no separate render state to reset.
    starting view. At roughly 14 seconds the four boosters peel outward;
    follow them as they tumble and fall while the core climbs. **R** restores
    the pad view and all four attached boosters; press **Space** again to repeat.
-4. For an OpenGL smoke check from the default view, render a hidden frame at
-   ignition, after separation, after the core stops, and after the visibility
-   cutoff:
+4. For an OpenGL smoke check from the default view, render hidden frames on
+   the pad, during ignition and ascent, during separation and the final fall,
+   and after impact:
 
    ```sh
-   for time in 3.5 14.9 17.6 18.4; do
+   ./baikonur --hidden --frames 1 --capture /tmp/baikonur-pad.ppm
+   for time in 3.5 7.0 14.9 17.78 17.9; do
        ./baikonur --hidden --frames 1 --simulate "$time" \
            --capture "/tmp/baikonur-$time.ppm" || break
    done
    ```
 
 AI assistance disclosure: OpenAI Codex inspected the existing booster
-implementation, made the follow-up code and test changes (including the
-terrain-contact timing), ran the build and verification commands, and drafted
-this document. The original booster
-implementation and the rest of the team's project were already present.
+implementation, made the follow-up changes to the animation, terrain contact,
+and booster details, added tests, ran the build and verification commands, and
+updated this document. The original booster implementation and the rest of the
+team's project were already present.
