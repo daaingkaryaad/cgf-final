@@ -1,4 +1,5 @@
 #include "Scene.h"
+#include <algorithm>
 
 using math3d::vec3;
 namespace {
@@ -118,9 +119,15 @@ void Scene::draw(const Part& part, const math3d::mat4& parent) {
 
 void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
                    const vec3& eye, const Rocket& rocket, bool padLight) {
+    // fit the transition from 8 to 48 scene units into the short demo ascent.
+    const float ascent = std::max(0.0f,std::min(1.0f,float((rocket.altitude()-8.0)/40.0)));
+    const float skyDarkness = ascent*ascent*(3.0f-2.0f*ascent);
+    const vec3 darkHorizon{0.095,0.145,0.235};
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     sky_.use();
+    sky_.scalar("skyDarkness",skyDarkness);
+    sky_.vector("darkHorizon",darkHorizon);
     glBindVertexArray(skyVao_);
     glDrawArrays(GL_TRIANGLES,0,3);
     glEnable(GL_DEPTH_TEST);
@@ -129,6 +136,8 @@ void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
     shader_.matrix("view",view);
     shader_.matrix("projection",projection);
     shader_.vector("eyePosition",eye);
+    shader_.scalar("skyDarkness",skyDarkness);
+    shader_.vector("darkHorizon",darkHorizon);
     shader_.vector("sunDirection",math3d::normalized({-0.5,0.8,0.35}));
     shader_.vector("padLightPosition",{8,7.0,4.7});
     shader_.integer("padLightOn",padLight ? 1 : 0);
