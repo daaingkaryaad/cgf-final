@@ -1,6 +1,7 @@
 #include "Camera.h"
 #include "Geometry.h"
 #include "Rocket.h"
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -54,6 +55,197 @@ void launchTests() {
     expect(close(rocket.altitude(),oldAltitude),"invalid update durations are ignored");
 }
 
+void boosterTests() {
+    using namespace math3d;
+    const double separation = 4.2+std::sqrt(2.0*54.0/1.1);
+    const vec3 pivot{0,3.2,0};
+    const std::array<vec3,Rocket::boosterCount> directions{{
+        {1,0,0}, {0,0,1}, {-1,0,0}, {0,0,-1}
+    }};
+    Rocket rocket;
+    std::array<mat4,Rocket::boosterCount> initial;
+    std::array<vec3,Rocket::boosterCount> before;
+    expect(!rocket.boostersSeparated() && rocket.boostersVisible(),"boosters are attached and visible on the pad");
+    const auto pad = transform_point(rocket.model(),pivot);
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        initial[i] = rocket.boosterModel(i);
+        const auto center = transform_point(initial[i],pivot);
+        expect(length(center-pad-directions[i]*1.38)<1e-5,"each booster sits at its cardinal mounting point");
+        const auto fin = transform_point(initial[i],pivot+vec3{1,0,0});
+        expect(length(fin-center-directions[i])<1e-5,"each booster's local positive x points outward");
+    }
+    rocket.start();
+    rocket.update(separation-0.001);
+    expect(!rocket.boostersSeparated() && rocket.boostersVisible(),"boosters stay attached below separation altitude");
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        before[i] = transform_point(rocket.boosterModel(i),pivot);
+        const auto expected = transform_point(initial[i],pivot)+vec3{0,rocket.altitude(),0};
+        expect(length(before[i]-expected)<1e-5,"all attached boosters follow the core");
+    }
+    rocket.update(0.002);
+    expect(rocket.boostersSeparated(),"boosters separate at 54 scene units");
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+        expect(length(transform_point(rocket.boosterModel(i),pivot)-before[i])<0.03,
+               "separation preserves each booster's center");
+    rocket.update(0.8);
+    const auto drifting = transform_point(rocket.boosterModel(0),pivot);
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        const auto center = transform_point(rocket.boosterModel(i),pivot);
+        expect(dot(center-before[i],directions[i])>3,"each booster drifts away from the core");
+    }
+    expect(std::abs(transform_point(rocket.boosterModel(0),{0,5.8,0}).x-drifting.x)>1,
+           "detached booster tumbles around its center");
+    rocket.update(1.7);
+    expect(transform_point(rocket.boosterModel(0),pivot).y<drifting.y,"detached booster falls while core rises");
+    rocket.update(0.6);
+    expect(rocket.stage()==Rocket::Stage::complete && rocket.boostersVisible(),"boosters keep falling after ascent ends");
+    const auto atCoreStop = transform_point(rocket.boosterModel(0),pivot);
+    rocket.update(0.6);
+    expect(rocket.boostersSeparated() && rocket.boostersVisible(),"boosters stay detached during the final fall");
+    expect(transform_point(rocket.boosterModel(0),pivot).y<atCoreStop.y && close(rocket.altitude(),90),
+           "booster motion continues while the core is stationary");
+    rocket.update(0.5);
+    expect(!rocket.boostersVisible(),"boosters disappear at ground impact");
+    rocket.reset();
+    expect(!rocket.boostersSeparated() && rocket.boostersVisible(),"reset restores attached booster visibility");
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+        expect(rocket.boosterModel(i)==initial[i],"reset restores each booster's pad transform");
+    rocket.start();
+    rocket.update(separation+0.3);
+    expect(rocket.boostersSeparated() && rocket.boostersVisible(),"relaunch separates boosters again");
+    Rocket fresh;
+    fresh.start();
+    fresh.update(separation+0.3);
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+        expect(rocket.boosterModel(i)==fresh.boosterModel(i),"relaunch does not retain previous booster motion");
+}
+
+void boosterTimingTests() {
+    using namespace math3d;
+    const double release = 4.2+std::sqrt(2.0*54.0/1.1);
+    const double justBefore = std::nextafter(release,0.0);
+    Rocket boundary;
+    boundary.start();
+    boundary.update(justBefore);
+    expect(!boundary.boostersSeparated(),"a coarse update just below the threshold does not separate boosters");
+    std::array<mat4,Rocket::boosterCount> attached;
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) attached[i] = boundary.boosterModel(i);
+    boundary.update(release-justBefore);
+    expect(boundary.boostersSeparated() && close(boundary.altitude(),54),"boosters separate at the exact launch time");
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        for (const vec3 point : {vec3{0,0,0}, vec3{0,6.65,0}, vec3{0.8,1.2,0}})
+            expect(length(transform_point(boundary.boosterModel(i),point)-transform_point(attached[i],point))<1e-5,
+                   "the base, tip and fin have no pose jump at release");
+    }
+
+    Rocket oneStep;
+    oneStep.start();
+    oneStep.update(release+3.5);
+    boundary.update(3.5);
+    expect(oneStep.stage()==Rocket::Stage::complete && oneStep.boostersSeparated() && oneStep.boostersVisible(),
+           "a single long update can reach a stationary core with falling boosters");
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+        expect(length(transform_point(oneStep.boosterModel(i),{0,6.65,0})-
+                      transform_point(boundary.boosterModel(i),{0,6.65,0}))<1e-5,
+               "a long update consumes only the time after release for booster motion");
+    oneStep.update(std::numeric_limits<double>::max());
+    expect(oneStep.boostersSeparated() && !oneStep.boostersVisible() && close(oneStep.altitude(),90),
+           "a huge finite update finishes booster flight without changing core altitude");
+}
+
+void boosterMotionTests() {
+    using namespace math3d;
+    const double release = 4.2+std::sqrt(2.0*54.0/1.1);
+    const vec3 pivot{0,3.2,0}, tip{0,6.65,0}, fin{0.8,1.2,0};
+    Rocket smooth;
+    smooth.start();
+    smooth.update(release);
+    const auto releaseCenter = transform_point(smooth.boosterModel(0),pivot);
+    const auto releaseTip = transform_point(smooth.boosterModel(0),tip)-releaseCenter;
+    smooth.update(0.001);
+    const auto center = transform_point(smooth.boosterModel(0),pivot);
+    expect(center.x>releaseCenter.x && center.x-releaseCenter.x<0.0001,
+           "outward movement eases in from rest");
+    expect(length(transform_point(smooth.boosterModel(0),tip)-center-releaseTip)<0.0001,
+           "tumble eases in from the attached orientation");
+
+    Rocket stepped;
+    stepped.start();
+    stepped.update(release);
+    double previousRadius = releaseCenter.x;
+    for (double age : {0.25, 1.0, 2.0, 3.0, 3.6}) {
+        Rocket coarse;
+        coarse.start();
+        coarse.update(release+age);
+        const auto first = coarse.boosterModel(0);
+        const auto firstCenter = transform_point(first,pivot);
+        expect(firstCenter.x>previousRadius && coarse.boostersVisible(),
+               "the visible boosters move outward without snapping back");
+        previousRadius = firstCenter.x;
+        for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+            const auto quarterTurn = rotation_y(-0.5*pi*i);
+            const auto pose = coarse.boosterModel(i);
+            for (const auto& point : {pivot,tip,fin})
+                expect(length(transform_point(pose,point)-
+                              transform_point(quarterTurn,transform_point(first,point)))<1e-5,
+                       "each booster follows the same motion rotated by its mounting angle");
+        }
+    }
+    for (int frame=0; frame<192; ++frame) stepped.update(1.0/64.0);
+    Rocket coarse;
+    coarse.start();
+    coarse.update(release+3.0);
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        for (const auto& point : {pivot,tip,fin})
+            expect(length(transform_point(stepped.boosterModel(i),point)-
+                          transform_point(coarse.boosterModel(i),point))<1e-5,
+                   "small updates and one coarse update produce the same detached pose");
+    }
+}
+
+void boosterImpactTests() {
+    using namespace math3d;
+    const double release = 4.2+std::sqrt(2.0*54.0/1.1);
+    Rocket fine;
+    fine.start();
+    fine.update(release+3.65);
+    expect(fine.boostersSeparated() && fine.boostersVisible() && fine.stage()==Rocket::Stage::complete,
+           "boosters remain visible on final approach after the core stops");
+    double age = 3.65;
+    while (fine.boostersVisible() && age<3.8) {
+        age += 0.001;
+        fine.update(0.001);
+    }
+    expect(!fine.boostersVisible(),"boosters disappear at terrain contact before the old cutoff");
+
+    Rocket coarse;
+    coarse.start();
+    coarse.update(release+age+1.0);
+    expect(coarse.boostersSeparated() && !coarse.boostersVisible() &&
+           coarse.stage()==Rocket::Stage::complete && close(coarse.altitude(),90) && close(coarse.velocity(),0),
+           "an update spanning impact leaves the finished core intact");
+    const auto groundRim = [](const mat4& pose) {
+        // Near contact the tilted upper shell rim is the lowest part of the booster.
+        return transform_point(pose,{0,5.65,0}).y-0.52*std::hypot(pose[1],pose[9]);
+    };
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        const auto impact = fine.boosterModel(i);
+        const double clearance = groundRim(impact)-(-0.025);
+        expect(clearance>=-1e-5 && clearance<0.1,"the tilted booster reaches the terrain without sinking below it");
+        expect(impact==coarse.boosterModel(i),"small and large updates retain the same impact pose");
+    }
+    fine.start();
+    fine.update(1.0);
+    expect(!fine.boostersVisible(),"impacted boosters stay hidden until reset");
+    fine.reset();
+    expect(fine.boostersVisible() && !fine.boostersSeparated(),"reset clears the impacted state");
+    fine.start();
+    fine.update(release+3.65);
+    expect(fine.boostersVisible(),"relaunch restores the full descent before the next impact");
+    fine.update(0.15);
+    expect(!fine.boostersVisible(),"relaunch reaches ground impact again");
+}
+
 void transformTests() {
     using namespace math3d;
     const vec3 localPoint{0.4,1,0};
@@ -102,7 +294,8 @@ void meshTest(const MeshData& mesh) {
 
 int main() {
     try {
-        launchTests(); transformTests(); cameraTests();
+        launchTests(); boosterTests(); boosterTimingTests(); boosterMotionTests(); boosterImpactTests();
+        transformTests(); cameraTests();
         meshTest(geometry::box()); meshTest(geometry::plane());
         meshTest(geometry::frustum(1)); meshTest(geometry::frustum(0)); meshTest(geometry::frustum(0.58f));
         std::cout<<checks<<" checks passed: launch, hierarchy, camera, geometry\n";
