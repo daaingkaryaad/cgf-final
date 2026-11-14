@@ -35,7 +35,7 @@ void main() {
     float distanceToStar = length(local - starPosition);
 
     float star = step(0.997, randomValue);
-    tar *= 1.0 - smoothstep(0.01, 0.045, distanceToStar);
+    star *= 1.0 - smoothstep(0.005, 0.04, distanceToStar);
 
     float starVisibility = smoothstep(0.35, 0.85, skyDarkness);
 
