@@ -50,7 +50,15 @@ void main() {
         1.0,
         starHash(cell + vec2(17.0, 23.0))
     );
-    skyColor += vec3(0.9, 0.93, 1.0)
+
+    float colorVariation = starHash(cell + vec2(31.0, 47.0));
+
+    vec3 warmStar = vec3(1.0, 0.94, 0.85);
+    vec3 coolStar = vec3(0.75, 0.85, 1.0);
+
+    vec3 starColor = mix(warmStar, coolStar, colorVariation);
+
+    skyColor += starColor
         * star * finalStarVisibility * twinkle * brightness;
     fragmentColour = vec4(skyColor, 1.0);
 }
