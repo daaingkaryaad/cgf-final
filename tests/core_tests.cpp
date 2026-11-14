@@ -272,6 +272,75 @@ void cameraTests() {
     for (float f:one.view()) expect(std::isfinite(f),"extreme mouse input keeps view finite");
     one.home(); Camera initial;
     expect(math3d::length(one.position()-initial.position())<1e-5,"home restores camera");
+
+    one.move(0,1,0,0.5,false);
+    one.look(70,-20);
+    const auto freeView = one.view();
+    const math3d::vec3 onPad{0,6,0}, ascending{0,26,0};
+    const math3d::vec3 invalidTarget{0,std::numeric_limits<double>::quiet_NaN(),0};
+    one.toggleChase(invalidTarget);
+    expect(!one.chasing() && one.view()==freeView,"invalid chase entry is ignored");
+    one.toggleChase(onPad);
+    const auto validChaseView = one.view();
+    one.follow(invalidTarget,0.2);
+    expect(one.view()==validChaseView,"invalid tracking target is ignored");
+    const auto initialChasePosition = one.position();
+    const auto centered = math3d::transform_point(one.view(), onPad);
+    expect(one.chasing() && close(centered.x,0) && close(centered.y,0) && centered.z<0,
+           "chase view centers the rocket on entry");
+    one.follow(ascending,0.2);
+    const double rise = one.position().y-initialChasePosition.y;
+    expect(rise>0 && rise<20,"chase view follows ascent smoothly");
+    many.toggleChase(onPad);
+    for (int i=0; i<20; ++i) many.follow(ascending,0.01);
+    expect(math3d::length(one.position()-many.position())<1e-5,
+           "chase smoothing uses elapsed time");
+    Camera extreme;
+    const double large = std::numeric_limits<double>::max();
+    extreme.toggleChase({large,0,0});
+    extreme.follow({-large,0,0},0.1);
+    expect(std::isfinite(extreme.position().x),"opposite large targets do not overflow interpolation");
+    extreme.follow(onPad,1000.0);
+    expect(math3d::length(extreme.position()-math3d::vec3{14,12,21})<1e-5,
+           "tracking recovers from extreme finite targets");
+    Camera snap;
+    snap.toggleChase(onPad);
+    snap.follow(ascending,1000.0);
+    Camera direct;
+    direct.toggleChase(ascending);
+    expect(snap.view()==direct.view(),"long tracking interval reaches the target");
+    one.move(1,1,1,0.5,true);
+    one.look(60,30);
+    one.toggleChase(ascending);
+    expect(!one.chasing() && one.view()==freeView,"leaving chase restores the original free view");
+    one.toggleChase(ascending);
+    one.home();
+    expect(!one.chasing() && one.view()==initial.view(),"home resets chase to the initial free view");
+
+    const auto rest = one.position();
+    one.updateIgnitionShake(false,0.08);
+    expect(one.view()==initial.view(),"camera stays steady before ignition");
+    one.updateIgnitionShake(true,0.08);
+    const double vibration = math3d::length(one.position()-rest);
+    expect(vibration>0.01 && vibration<0.4,"ignition shake adds a small visible offset");
+    one.updateIgnitionShake(true,1.0);
+    expect(math3d::length(one.position()-rest)<vibration,"ignition shake fades during ignition");
+    one.updateIgnitionShake(true,std::numeric_limits<double>::max());
+    expect(one.view()==initial.view(),"extreme ignition duration settles the camera");
+    one.updateIgnitionShake(true,0.1);
+    expect(one.view()==initial.view(),"settled shake does not restart until reset");
+    one.updateIgnitionShake(false,0.02);
+    expect(one.view()==initial.view(),"leaving ignition clears shake without camera drift");
+
+    one.toggleChase(onPad);
+    const auto steadyChase = one.view();
+    one.updateIgnitionShake(true,0.08);
+    expect(one.view()!=steadyChase,"ignition shake also works in chase mode");
+    const auto shakenCenter = math3d::transform_point(one.view(),onPad);
+    expect(close(shakenCenter.x,0) && close(shakenCenter.y,0) && shakenCenter.z<0,
+           "shake keeps the tracked rocket centered");
+    one.home();
+    expect(!one.chasing() && one.view()==initial.view(),"reset clears ignition shake and chase mode");
 }
 
 void meshTest(const MeshData& mesh) {
