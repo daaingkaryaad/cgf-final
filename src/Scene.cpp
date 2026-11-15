@@ -1,12 +1,11 @@
 #include "Scene.h"
+#include <algorithm>
 
 using math3d::vec3;
 namespace {
 const vec3 cream{0.87,0.86,0.77}, orange{0.82,0.25,0.085}, dark{0.12,0.18,0.18};
 const vec3 steel{0.27,0.34,0.33}, yellow{0.78,0.53,0.14};
-constexpr std::array<vec3,5> nozzleOffsets{{
-    {0,0.263,0}, {1.38,0.08,0}, {0,0.08,1.38}, {-1.38,0.08,0}, {0,0.08,-1.38}
-}};
+constexpr vec3 coreOutlet{0,0.263,0}, boosterOutlet{0,0.08,0};
 }
 
 Scene::Scene(const std::string& directory)
@@ -21,6 +20,7 @@ Scene::Scene(const std::string& directory)
     glGenVertexArrays(1,&skyVao_);
     buildSite();
     buildRocket();
+    buildBoosters();
 }
 
 Scene::~Scene() { glDeleteVertexArrays(1,&skyVao_); }
@@ -95,20 +95,20 @@ void Scene::buildRocket() {
     add(rocket_,taper,{0,1.5,0},{1.05,0.9,1.05},steel,0.6f);
     add(rocket_,cylinder,{0,2.05,0},{0.88,0.20,0.88},orange,0.5f);
     add(rocket_,taper,{0,0.62,0},{0.48,0.72,0.48},dark,0.8f);
-    for (int i=0; i<4; ++i) {
-        const double a=i*math3d::pi*0.5;
-        const auto booster=math3d::multiply(math3d::translation({1.38*std::cos(a),0,1.38*std::sin(a)}),math3d::rotation_y(-a));
-        const std::size_t first=rocket_.size();
-        add(rocket_,cylinder,{0,3.4,0},{0.52,4.5,0.52},cream,0.65f);
-        add(rocket_,cone,{0,6.15,0},{0.52,1.0,0.52},cream,0.65f);
-        add(rocket_,taper,{0,0.8,0},{0.68,0.7,0.68},steel,0.55f);
-        add(rocket_,cylinder,{0,1.45,0},{0.53,0.32,0.53},orange,0.35f);
-        add(rocket_,taper,{0,0.30,0},{0.32,0.42,0.32},dark,0.8f);
-        add(rocket_,box,{0.49,1.2,0},{0.65,1.25,0.10},steel,0.45f);
-        for (std::size_t j=first; j<rocket_.size(); ++j)
-            rocket_[j].local=math3d::multiply(booster,rocket_[j].local);
-    }
     add(rocket_,box,{0,5.6,0.861},{0.16,2.6,0.025},orange,0.2f);
+}
+
+void Scene::buildBoosters() {
+    add(boosterParts_,cylinder,{0,3.4,0},{0.52,4.5,0.52},cream,0.65f);
+    add(boosterParts_,cone,{0,6.15,0},{0.52,1.0,0.52},cream,0.65f);
+    add(boosterParts_,taper,{0,0.8,0},{0.68,0.7,0.68},steel,0.55f);
+    add(boosterParts_,cylinder,{0,1.45,0},{0.53,0.32,0.53},orange,0.35f);
+    add(boosterParts_,cylinder,{0,5.54,0},{0.58,0.20,0.58},orange,0.35f);
+    add(boosterParts_,taper,{0,0.30,0},{0.32,0.42,0.32},dark,0.8f);
+    add(boosterParts_,box,{0.49,1.2,0},{0.65,1.25,0.10},steel,0.45f);
+    // Local -X faces the core. These lugs overlap the shell and remain with it after release.
+    for (double height : {2.45,5.3})
+        add(boosterParts_,box,{-0.50,height,0},{0.14,0.24,0.20},dark,0.45f);
 }
 
 void Scene::draw(const Part& part, const math3d::mat4& parent) {
@@ -121,17 +121,40 @@ void Scene::draw(const Part& part, const math3d::mat4& parent) {
 }
 
 void Scene::updateExhaust(const Rocket& rocket, double dt) {
-    auto outlets = nozzleOffsets;
-    const auto model = rocket.model();
-    for (auto& outlet : outlets) outlet = math3d::transform_point(model,outlet);
-    exhaust_.update(dt,outlets,rocket.enginesOn());
+    ParticleSystem::Outlets outlets{};
+    outlets[0] = math3d::transform_point(rocket.model(),coreOutlet);
+    std::size_t activeOutlets = 1;
+    if (!rocket.boostersSeparated()) {
+        for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+            outlets[activeOutlets++] = math3d::transform_point(rocket.boosterModel(i),boosterOutlet);
+    }
+    exhaust_.update(dt,outlets,rocket.enginesOn(),activeOutlets);
+}
+
+void Scene::drawBoosters(const Rocket& rocket) {
+    if (!rocket.boostersVisible()) return;
+    const bool showGlow = rocket.enginesOn() && !rocket.boostersSeparated();
+    static const Part nozzleGlow{cylinder,math3d::transform({0,0.08,0},{0.27,0.018,0.27}),
+                                 {1,0.55,0.12},0,0,true};
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        // Rocket supplies a world pose in both states. Apply only the part's local transform.
+        const auto model = rocket.boosterModel(i);
+        for (const auto& part : boosterParts_) draw(part,model);
+        if (showGlow) draw(nozzleGlow,model);
+    }
 }
 
 void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
                    const vec3& eye, const Rocket& rocket, bool padLight) {
+    // fit the transition from 8 to 48 scene units into the short demo ascent.
+    const float ascent = std::max(0.0f,std::min(1.0f,float((rocket.altitude()-8.0)/40.0)));
+    const float skyDarkness = ascent*ascent*(3.0f-2.0f*ascent);
+    const vec3 darkHorizon{0.095,0.145,0.235};
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     sky_.use();
+    sky_.scalar("skyDarkness",skyDarkness);
+    sky_.vector("darkHorizon",darkHorizon);
     glBindVertexArray(skyVao_);
     glDrawArrays(GL_TRIANGLES,0,3);
     glEnable(GL_DEPTH_TEST);
@@ -140,6 +163,8 @@ void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
     shader_.matrix("view",view);
     shader_.matrix("projection",projection);
     shader_.vector("eyePosition",eye);
+    shader_.scalar("skyDarkness",skyDarkness);
+    shader_.vector("darkHorizon",darkHorizon);
     shader_.vector("sunDirection",math3d::normalized({-0.5,0.8,0.35}));
     shader_.vector("padLightPosition",{8,7.0,4.7});
     shader_.integer("padLightOn",padLight ? 1 : 0);
@@ -147,18 +172,16 @@ void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
     concrete_.bind();
     const auto identity=math3d::identity();
     for (const auto& part : site_) draw(part,identity);
-    for (const auto& part : rocket_) draw(part,rocket.model());
+    const auto coreModel = rocket.model();
+    for (const auto& part : rocket_) draw(part,coreModel);
+    drawBoosters(rocket);
     Part lens{box,math3d::transform({8,7.1,4.74},{0.85,0.3,0.03}),
         padLight ? vec3{1,0.82,0.40} : vec3{0.2,0.21,0.18},0.1f,0,padLight};
     draw(lens,identity);
     if (rocket.enginesOn()) {
-        const auto model = rocket.model();
-        for (std::size_t i=0; i<nozzleOffsets.size(); ++i) {
-            const double radius = i==0 ? 0.39 : 0.27;
-            Part nozzle{cylinder,math3d::transform(nozzleOffsets[i],{radius,0.018,radius}),
+        Part coreNozzle{cylinder,math3d::transform({0,0.263,0},{0.39,0.018,0.39}),
                         {1,0.55,0.12},0,0,true};
-            draw(nozzle,model);
-        }
+        draw(coreNozzle,coreModel);
     }
     exhaust_.render(view,projection);
 }

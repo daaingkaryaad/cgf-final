@@ -1,7 +1,9 @@
 #include "Camera.h"
 #include "Geometry.h"
 #include "Rocket.h"
+#include <array>
 #include <cmath>
+#include <functional>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -54,8 +56,223 @@ void launchTests() {
     expect(close(rocket.altitude(),oldAltitude),"invalid update durations are ignored");
 }
 
+void boosterTests() {
+    using namespace math3d;
+    const double separation = 4.2+std::sqrt(2.0*54.0/1.1);
+    const vec3 pivot{0,3.2,0};
+    const std::array<vec3,Rocket::boosterCount> directions{{
+        {1,0,0}, {0,0,1}, {-1,0,0}, {0,0,-1}
+    }};
+    Rocket rocket;
+    std::array<mat4,Rocket::boosterCount> initial;
+    std::array<vec3,Rocket::boosterCount> before;
+    expect(!rocket.boostersSeparated() && rocket.boostersVisible(),"boosters are attached and visible on the pad");
+    const auto pad = transform_point(rocket.model(),pivot);
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        initial[i] = rocket.boosterModel(i);
+        const auto center = transform_point(initial[i],pivot);
+        expect(length(center-pad-directions[i]*1.38)<1e-5,"each booster sits at its cardinal mounting point");
+        const auto fin = transform_point(initial[i],pivot+vec3{1,0,0});
+        expect(length(fin-center-directions[i])<1e-5,"each booster's local positive x points outward");
+    }
+    rocket.start();
+    rocket.update(separation-0.001);
+    expect(!rocket.boostersSeparated() && rocket.boostersVisible(),"boosters stay attached below separation altitude");
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        before[i] = transform_point(rocket.boosterModel(i),pivot);
+        const auto expected = transform_point(initial[i],pivot)+vec3{0,rocket.altitude(),0};
+        expect(length(before[i]-expected)<1e-5,"all attached boosters follow the core");
+    }
+    rocket.update(0.002);
+    expect(rocket.boostersSeparated(),"boosters separate at 54 scene units");
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+        expect(length(transform_point(rocket.boosterModel(i),pivot)-before[i])<0.03,
+               "separation preserves each booster's center");
+    rocket.update(0.8);
+    const auto drifting = transform_point(rocket.boosterModel(0),pivot);
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        const auto center = transform_point(rocket.boosterModel(i),pivot);
+        expect(dot(center-before[i],directions[i])>3,"each booster drifts away from the core");
+    }
+    expect(std::abs(transform_point(rocket.boosterModel(0),{0,5.8,0}).x-drifting.x)>1,
+           "detached booster tumbles around its center");
+    rocket.update(1.7);
+    expect(transform_point(rocket.boosterModel(0),pivot).y<drifting.y,"detached booster falls while core rises");
+    rocket.update(0.6);
+    expect(rocket.stage()==Rocket::Stage::complete && rocket.boostersVisible(),"boosters keep falling after ascent ends");
+    const auto atCoreStop = transform_point(rocket.boosterModel(0),pivot);
+    rocket.update(0.6);
+    expect(rocket.boostersSeparated() && rocket.boostersVisible(),"boosters stay detached during the final fall");
+    expect(transform_point(rocket.boosterModel(0),pivot).y<atCoreStop.y && close(rocket.altitude(),90),
+           "booster motion continues while the core is stationary");
+    rocket.update(0.5);
+    expect(!rocket.boostersVisible(),"boosters disappear at ground impact");
+    rocket.reset();
+    expect(!rocket.boostersSeparated() && rocket.boostersVisible(),"reset restores attached booster visibility");
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+        expect(rocket.boosterModel(i)==initial[i],"reset restores each booster's pad transform");
+    rocket.start();
+    rocket.update(separation+0.3);
+    expect(rocket.boostersSeparated() && rocket.boostersVisible(),"relaunch separates boosters again");
+    Rocket fresh;
+    fresh.start();
+    fresh.update(separation+0.3);
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+        expect(rocket.boosterModel(i)==fresh.boosterModel(i),"relaunch does not retain previous booster motion");
+}
+
+void boosterTimingTests() {
+    using namespace math3d;
+    const double release = 4.2+std::sqrt(2.0*54.0/1.1);
+    const double justBefore = std::nextafter(release,0.0);
+    Rocket boundary;
+    boundary.start();
+    boundary.update(justBefore);
+    expect(!boundary.boostersSeparated(),"a coarse update just below the threshold does not separate boosters");
+    std::array<mat4,Rocket::boosterCount> attached;
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) attached[i] = boundary.boosterModel(i);
+    boundary.update(release-justBefore);
+    expect(boundary.boostersSeparated() && close(boundary.altitude(),54),"boosters separate at the exact launch time");
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        for (const vec3 point : {vec3{0,0,0}, vec3{0,6.65,0}, vec3{0.8,1.2,0}})
+            expect(length(transform_point(boundary.boosterModel(i),point)-transform_point(attached[i],point))<1e-5,
+                   "the base, tip and fin have no pose jump at release");
+    }
+
+    Rocket oneStep;
+    oneStep.start();
+    oneStep.update(release+3.5);
+    boundary.update(3.5);
+    expect(oneStep.stage()==Rocket::Stage::complete && oneStep.boostersSeparated() && oneStep.boostersVisible(),
+           "a single long update can reach a stationary core with falling boosters");
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+        expect(length(transform_point(oneStep.boosterModel(i),{0,6.65,0})-
+                      transform_point(boundary.boosterModel(i),{0,6.65,0}))<1e-5,
+               "a long update consumes only the time after release for booster motion");
+    oneStep.update(std::numeric_limits<double>::max());
+    expect(oneStep.boostersSeparated() && !oneStep.boostersVisible() && close(oneStep.altitude(),90),
+           "a huge finite update finishes booster flight without changing core altitude");
+}
+
+void boosterMotionTests() {
+    using namespace math3d;
+    const double release = 4.2+std::sqrt(2.0*54.0/1.1);
+    const vec3 pivot{0,3.2,0}, tip{0,6.65,0}, fin{0.8,1.2,0};
+    Rocket smooth;
+    smooth.start();
+    smooth.update(release);
+    const auto releaseCenter = transform_point(smooth.boosterModel(0),pivot);
+    const auto releaseTip = transform_point(smooth.boosterModel(0),tip)-releaseCenter;
+    smooth.update(0.001);
+    const auto center = transform_point(smooth.boosterModel(0),pivot);
+    expect(center.x>releaseCenter.x && center.x-releaseCenter.x<0.0001,
+           "outward movement eases in from rest");
+    expect(length(transform_point(smooth.boosterModel(0),tip)-center-releaseTip)<0.0001,
+           "tumble eases in from the attached orientation");
+
+    Rocket stepped;
+    stepped.start();
+    stepped.update(release);
+    double previousRadius = releaseCenter.x;
+    for (double age : {0.25, 1.0, 2.0, 3.0, 3.6}) {
+        Rocket coarse;
+        coarse.start();
+        coarse.update(release+age);
+        const auto first = coarse.boosterModel(0);
+        const auto firstCenter = transform_point(first,pivot);
+        expect(firstCenter.x>previousRadius && coarse.boostersVisible(),
+               "the visible boosters move outward without snapping back");
+        previousRadius = firstCenter.x;
+        for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+            const auto quarterTurn = rotation_y(-0.5*pi*i);
+            const auto pose = coarse.boosterModel(i);
+            for (const auto& point : {pivot,tip,fin})
+                expect(length(transform_point(pose,point)-
+                              transform_point(quarterTurn,transform_point(first,point)))<1e-5,
+                       "each booster follows the same motion rotated by its mounting angle");
+        }
+    }
+    for (int frame=0; frame<192; ++frame) stepped.update(1.0/64.0);
+    Rocket coarse;
+    coarse.start();
+    coarse.update(release+3.0);
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        for (const auto& point : {pivot,tip,fin})
+            expect(length(transform_point(stepped.boosterModel(i),point)-
+                          transform_point(coarse.boosterModel(i),point))<1e-5,
+                   "small updates and one coarse update produce the same detached pose");
+    }
+}
+
+void boosterImpactTests() {
+    using namespace math3d;
+    const double release = 4.2+std::sqrt(2.0*54.0/1.1);
+    Rocket fine;
+    fine.start();
+    fine.update(release+3.65);
+    expect(fine.boostersSeparated() && fine.boostersVisible() && fine.stage()==Rocket::Stage::complete,
+           "boosters remain visible on final approach after the core stops");
+    double age = 3.65;
+    while (fine.boostersVisible() && age<3.8) {
+        age += 0.001;
+        fine.update(0.001);
+    }
+    expect(!fine.boostersVisible(),"boosters disappear at terrain contact before the old cutoff");
+
+    Rocket coarse;
+    coarse.start();
+    coarse.update(release+age+1.0);
+    expect(coarse.boostersSeparated() && !coarse.boostersVisible() &&
+           coarse.stage()==Rocket::Stage::complete && close(coarse.altitude(),90) && close(coarse.velocity(),0),
+           "an update spanning impact leaves the finished core intact");
+    const auto groundRim = [](const mat4& pose) {
+        // Near contact the tilted upper shell rim is the lowest part of the booster.
+        return transform_point(pose,{0,5.65,0}).y-0.52*std::hypot(pose[1],pose[9]);
+    };
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+        const auto impact = fine.boosterModel(i);
+        const double clearance = groundRim(impact)-(-0.025);
+        expect(clearance>=-1e-5 && clearance<0.1,"the tilted booster reaches the terrain without sinking below it");
+        expect(impact==coarse.boosterModel(i),"small and large updates retain the same impact pose");
+    }
+    fine.start();
+    fine.update(1.0);
+    expect(!fine.boostersVisible(),"impacted boosters stay hidden until reset");
+    fine.reset();
+    expect(fine.boostersVisible() && !fine.boostersSeparated(),"reset clears the impacted state");
+    fine.start();
+    fine.update(release+3.65);
+    expect(fine.boostersVisible(),"relaunch restores the full descent before the next impact");
+    fine.update(0.15);
+    expect(!fine.boostersVisible(),"relaunch reaches ground impact again");
+}
+
 void transformTests() {
     using namespace math3d;
+    const double largest = std::numeric_limits<double>::max();
+    const double smallest = std::numeric_limits<double>::denorm_min();
+    const auto largeUnit = normalized({largest,largest,0});
+    const auto smallUnit = normalized({smallest,smallest,0});
+    expect(close(length(largeUnit),1) && close(largeUnit.x,std::sqrt(0.5)),"large vectors normalize safely");
+    expect(close(length(smallUnit),1) && close(smallUnit.x,std::sqrt(0.5)),"subnormal vectors normalize safely");
+    const auto poleView = look_at({0,0,0},{0,1,0},{0,1,0});
+    const auto poleTarget = transform_point(poleView,{0,1,0});
+    expect(close(poleTarget.x,0) && close(poleTarget.y,0) && close(poleTarget.z,-1),
+           "parallel up vector uses a stable camera basis");
+    const auto oppositeView = look_at({0,0,0},{0,-1,0},{0,1,0});
+    const auto oppositeTarget = transform_point(oppositeView,{0,-1,0});
+    expect(close(oppositeTarget.x,0) && close(oppositeTarget.y,0) && close(oppositeTarget.z,-1),
+           "opposite up vector uses a stable camera basis");
+    mat4 lhs{}, rhs{};
+    const float maxFloat = std::numeric_limits<float>::max();
+    lhs[0] = maxFloat; lhs[4] = maxFloat;
+    rhs[0] = 2; rhs[1] = -2;
+    expect(multiply(lhs,rhs)[0]==0.0f,"matrix product avoids intermediate float overflow");
+    rhs[1] = 0;
+    bool rejected = false;
+    try { multiply(lhs,rhs); } catch (const std::runtime_error&) { rejected = true; }
+    expect(rejected,"matrix product rejects unrepresentable output");
+    expect(multiply(identity(),identity())==identity(),"matrix multiplication preserves identity");
     const vec3 localPoint{0.4,1,0};
     const mat4 child=transform({1.38,3.4,0},{0.52,4.5,0.52});
     const mat4 parent=translation({0,20.65,0});
@@ -69,6 +286,33 @@ void transformTests() {
     expect(length(bottom-vec3{1,2,3})<1e-5 && length(top-vec3{4,7,9})<1e-5,"beam endpoints");
 }
 
+void projectionTests() {
+    using namespace math3d;
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const auto validPerspective = perspective(pi/3, 16.0/9.0, 0.1, 1000.0);
+    const auto validOrtho = orthographic(-5,5,-4,4,0.1,1000.0);
+    for (float value : validPerspective) expect(std::isfinite(value),"valid perspective is finite");
+    for (float value : validOrtho) expect(std::isfinite(value),"valid orthographic matrix is finite");
+    const auto invalid = [](const std::function<void()>& function) {
+        try { function(); } catch (const std::runtime_error&) { return true; }
+        return false;
+    };
+    expect(invalid([&]{ perspective(pi/3,1e-100,0.1,100); }),"perspective rejects float overflow");
+    expect(invalid([&]{ perspective(pi/3,1e100,0.1,100); }),"perspective rejects zero horizontal scale");
+    expect(invalid([&]{ orthographic(0,1e100,-5,5,0.1,100); }),"orthographic rejects zero horizontal scale");
+    expect(invalid([&]{ orthographic(-5,5,-5,5,0.1,1e100); }),"orthographic rejects zero depth scale");
+    expect(invalid([&]{ orthographic(0,1e-100,-5,5,0.1,100); }),"orthographic rejects float overflow");
+    const auto distant = perspective(pi/3,1,0.1,std::numeric_limits<double>::max());
+    expect(close(distant[10],-1) && close(distant[14],-0.2),"large far plane avoids intermediate overflow");
+    expect(invalid([&]{ perspective(nan,1,0.1,100); }),"perspective rejects NaN angle");
+    expect(invalid([&]{ perspective(pi/3,infinity,0.1,100); }),"perspective rejects infinite aspect");
+    expect(invalid([&]{ perspective(pi/3,1,0.1,infinity); }),"perspective rejects infinite far plane");
+    expect(invalid([&]{ orthographic(nan,5,-5,5,0.1,100); }),"orthographic rejects NaN bound");
+    expect(invalid([&]{ orthographic(-5,infinity,-5,5,0.1,100); }),"orthographic rejects infinite bound");
+    expect(invalid([&]{ orthographic(-5,5,-5,5,0.1,infinity); }),"orthographic rejects infinite far plane");
+}
+
 void cameraTests() {
     Camera one,many;
     one.move(1,0,0,1,false);
@@ -78,8 +322,99 @@ void cameraTests() {
     expect(one.position().y>=0.8,"camera cannot descend below ground");
     one.look(1e6,1e6);
     for (float f:one.view()) expect(std::isfinite(f),"extreme mouse input keeps view finite");
+    const auto safePosition = one.position();
+    const auto safeView = one.view();
+    one.move(1,0,0,-1,false);
+    one.move(1,0,0,std::numeric_limits<double>::quiet_NaN(),false);
+    one.move(std::numeric_limits<double>::infinity(),0,0,1,false);
+    one.move(0,std::numeric_limits<double>::quiet_NaN(),0,1,false);
+    expect(one.position().x==safePosition.x && one.position().y==safePosition.y &&
+           one.position().z==safePosition.z,"invalid camera movement is ignored");
+    one.look(std::numeric_limits<double>::quiet_NaN(),0);
+    one.look(0,std::numeric_limits<double>::infinity());
+    expect(one.view()==safeView,"invalid mouse movement is ignored");
+    Camera huge, bounded;
+    huge.move(std::numeric_limits<double>::max(),0,0,0.1,false);
+    bounded.move(1,0,0,0.1,false);
+    expect(math3d::length(huge.position()-bounded.position())<1e-5,"movement axes are bounded");
+    const auto beforeOverflow = huge.position();
+    huge.move(1,0,0,std::numeric_limits<double>::max(),true);
+    expect(math3d::length(huge.position()-beforeOverflow)<1e-5,"overflowing movement is ignored");
+    huge.look(std::numeric_limits<double>::max(),0);
+    const auto hugeView = huge.view();
+    huge.look(100,0);
+    expect(huge.view()!=hugeView,"mouse remains responsive after huge yaw input");
     one.home(); Camera initial;
     expect(math3d::length(one.position()-initial.position())<1e-5,"home restores camera");
+
+    one.move(0,1,0,0.5,false);
+    one.look(70,-20);
+    const auto freeView = one.view();
+    const math3d::vec3 onPad{0,6,0}, ascending{0,26,0};
+    const math3d::vec3 invalidTarget{0,std::numeric_limits<double>::quiet_NaN(),0};
+    one.toggleChase(invalidTarget);
+    expect(!one.chasing() && one.view()==freeView,"invalid chase entry is ignored");
+    one.toggleChase(onPad);
+    const auto validChaseView = one.view();
+    one.follow(invalidTarget,0.2);
+    expect(one.view()==validChaseView,"invalid tracking target is ignored");
+    const auto initialChasePosition = one.position();
+    const auto centered = math3d::transform_point(one.view(), onPad);
+    expect(one.chasing() && close(centered.x,0) && close(centered.y,0) && centered.z<0,
+           "chase view centers the rocket on entry");
+    one.follow(ascending,0.2);
+    const double rise = one.position().y-initialChasePosition.y;
+    expect(rise>0 && rise<20,"chase view follows ascent smoothly");
+    many.toggleChase(onPad);
+    for (int i=0; i<20; ++i) many.follow(ascending,0.01);
+    expect(math3d::length(one.position()-many.position())<1e-5,
+           "chase smoothing uses elapsed time");
+    Camera extreme;
+    const double large = std::numeric_limits<double>::max();
+    extreme.toggleChase({large,0,0});
+    extreme.follow({-large,0,0},0.1);
+    expect(std::isfinite(extreme.position().x),"opposite large targets do not overflow interpolation");
+    extreme.follow(onPad,1000.0);
+    expect(math3d::length(extreme.position()-math3d::vec3{14,12,21})<1e-5,
+           "tracking recovers from extreme finite targets");
+    Camera snap;
+    snap.toggleChase(onPad);
+    snap.follow(ascending,1000.0);
+    Camera direct;
+    direct.toggleChase(ascending);
+    expect(snap.view()==direct.view(),"long tracking interval reaches the target");
+    one.move(1,1,1,0.5,true);
+    one.look(60,30);
+    one.toggleChase(ascending);
+    expect(!one.chasing() && one.view()==freeView,"leaving chase restores the original free view");
+    one.toggleChase(ascending);
+    one.home();
+    expect(!one.chasing() && one.view()==initial.view(),"home resets chase to the initial free view");
+
+    const auto rest = one.position();
+    one.updateIgnitionShake(false,0.08);
+    expect(one.view()==initial.view(),"camera stays steady before ignition");
+    one.updateIgnitionShake(true,0.08);
+    const double vibration = math3d::length(one.position()-rest);
+    expect(vibration>0.01 && vibration<0.4,"ignition shake adds a small visible offset");
+    one.updateIgnitionShake(true,1.0);
+    expect(math3d::length(one.position()-rest)<vibration,"ignition shake fades during ignition");
+    one.updateIgnitionShake(true,std::numeric_limits<double>::max());
+    expect(one.view()==initial.view(),"extreme ignition duration settles the camera");
+    one.updateIgnitionShake(true,0.1);
+    expect(one.view()==initial.view(),"settled shake does not restart until reset");
+    one.updateIgnitionShake(false,0.02);
+    expect(one.view()==initial.view(),"leaving ignition clears shake without camera drift");
+
+    one.toggleChase(onPad);
+    const auto steadyChase = one.view();
+    one.updateIgnitionShake(true,0.08);
+    expect(one.view()!=steadyChase,"ignition shake also works in chase mode");
+    const auto shakenCenter = math3d::transform_point(one.view(),onPad);
+    expect(close(shakenCenter.x,0) && close(shakenCenter.y,0) && shakenCenter.z<0,
+           "shake keeps the tracked rocket centered");
+    one.home();
+    expect(!one.chasing() && one.view()==initial.view(),"reset clears ignition shake and chase mode");
 }
 
 void meshTest(const MeshData& mesh) {
@@ -102,7 +437,8 @@ void meshTest(const MeshData& mesh) {
 
 int main() {
     try {
-        launchTests(); transformTests(); cameraTests();
+        launchTests(); boosterTests(); boosterTimingTests(); boosterMotionTests(); boosterImpactTests();
+        transformTests(); cameraTests(); projectionTests();
         meshTest(geometry::box()); meshTest(geometry::plane());
         meshTest(geometry::frustum(1)); meshTest(geometry::frustum(0)); meshTest(geometry::frustum(0.58f));
         std::cout<<checks<<" checks passed: launch, hierarchy, camera, geometry\n";

@@ -86,7 +86,8 @@ void Hud::text(float x,float y,const std::string& value,float size,const math3d:
     }
 }
 
-void Hud::render(int width,int height,const Rocket& rocket,double fps,bool padLight,bool captured) {
+void Hud::render(int width,int height,const Rocket& rocket,double fps,
+                 bool padLight,bool captured,bool chaseCamera) {
     const float scale=std::min(float(width)/1280.0f,float(height)/720.0f);
     if (scale<=0) return;
     const float virtualWidth=width/scale, virtualHeight=height/scale;
@@ -103,7 +104,7 @@ void Hud::render(int width,int height,const Rocket& rocket,double fps,bool padLi
     else count<<"measuring fps";
     text(virtualWidth-239,41,count.str(),2,white);
     text(virtualWidth-239,68,padLight ? "pad light / on" : "pad light / off",1.3f,amber);
-    text(virtualWidth-239,96,"camera / free",1.3f,muted);
+    text(virtualWidth-239,96,chaseCamera ? "camera / chase" : "camera / free",1.3f,muted);
     rect(24,virtualHeight-214,410,106,panel,0.92f);
     text(43,virtualHeight-198,"mission status",1.2f,muted);
     std::string status=rocket.status();
@@ -114,9 +115,13 @@ void Hud::render(int width,int height,const Rocket& rocket,double fps,bool padLi
     telemetry<<std::fixed<<std::setprecision(1)<<"alt "<<rocket.altitude()<<" m / "<<rocket.velocity()<<" m/s";
     text(43,virtualHeight-139,telemetry.str(),1.4f,white);
     rect(24,virtualHeight-88,virtualWidth-48,64,panel,0.94f);
-    text(43,virtualHeight-74,"space launch | r reset scene | l pad light | h home camera",1.4f,white);
-    text(43,virtualHeight-49,"wasd move | q/e down/up | shift faster | mouse look",1.15f,muted);
-    text(virtualWidth-372,virtualHeight-49,captured ? "tab/esc release mouse" : "click/tab capture mouse",1.15f,amber);
+    text(43,virtualHeight-74,"space launch | r reset scene | l pad light | h home camera | c camera mode",1.4f,white);
+    if (chaseCamera) {
+        text(43,virtualHeight-49,"tracking rocket | c returns to free view",1.15f,muted);
+    } else {
+        text(43,virtualHeight-49,"wasd move | q/e down/up | shift faster | mouse look",1.15f,muted);
+        text(virtualWidth-372,virtualHeight-49,captured ? "tab/esc release mouse" : "click/tab capture mouse",1.15f,amber);
+    }
     if (captured) {
         rect(virtualWidth*0.5f-5,virtualHeight*0.5f,10,1,white,0.6f);
         rect(virtualWidth*0.5f,virtualHeight*0.5f-5,1,10,white,0.6f);
