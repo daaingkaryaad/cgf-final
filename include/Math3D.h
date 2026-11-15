@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <limits>
@@ -37,11 +38,12 @@ inline double length(const vec3& a) {
     return std::hypot(std::hypot(a.x, a.y), a.z);
 }
 inline vec3 normalized(const vec3& a) {
-    const double n = length(a);
-    if (!(n > 0.0) || !std::isfinite(n)) {
-        throw std::runtime_error("cannot normalize a zero or non-finite vector");
-    }
-    return a / n;
+    if (!std::isfinite(a.x) || !std::isfinite(a.y) || !std::isfinite(a.z))
+        throw std::runtime_error("cannot normalize a non-finite vector");
+    const double scale = std::max(std::abs(a.x), std::max(std::abs(a.y), std::abs(a.z)));
+    if (!(scale > 0.0)) throw std::runtime_error("cannot normalize a zero vector");
+    const vec3 scaled = a / scale;
+    return scaled / length(scaled);
 }
 
 using mat4 = std::array<float, 16>;

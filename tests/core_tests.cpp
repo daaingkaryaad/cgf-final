@@ -57,6 +57,12 @@ void launchTests() {
 
 void transformTests() {
     using namespace math3d;
+    const double largest = std::numeric_limits<double>::max();
+    const double smallest = std::numeric_limits<double>::denorm_min();
+    const auto largeUnit = normalized({largest,largest,0});
+    const auto smallUnit = normalized({smallest,smallest,0});
+    expect(close(length(largeUnit),1) && close(largeUnit.x,std::sqrt(0.5)),"large vectors normalize safely");
+    expect(close(length(smallUnit),1) && close(smallUnit.x,std::sqrt(0.5)),"subnormal vectors normalize safely");
     const auto poleView = look_at({0,0,0},{0,1,0},{0,1,0});
     const auto poleTarget = transform_point(poleView,{0,1,0});
     expect(close(poleTarget.x,0) && close(poleTarget.y,0) && close(poleTarget.z,-1),
