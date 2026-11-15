@@ -71,6 +71,16 @@ void transformTests() {
     const auto oppositeTarget = transform_point(oppositeView,{0,-1,0});
     expect(close(oppositeTarget.x,0) && close(oppositeTarget.y,0) && close(oppositeTarget.z,-1),
            "opposite up vector uses a stable camera basis");
+    mat4 lhs{}, rhs{};
+    const float maxFloat = std::numeric_limits<float>::max();
+    lhs[0] = maxFloat; lhs[4] = maxFloat;
+    rhs[0] = 2; rhs[1] = -2;
+    expect(multiply(lhs,rhs)[0]==0.0f,"matrix product avoids intermediate float overflow");
+    rhs[1] = 0;
+    bool rejected = false;
+    try { multiply(lhs,rhs); } catch (const std::runtime_error&) { rejected = true; }
+    expect(rejected,"matrix product rejects unrepresentable output");
+    expect(multiply(identity(),identity())==identity(),"matrix multiplication preserves identity");
     const vec3 localPoint{0.4,1,0};
     const mat4 child=transform({1.38,3.4,0},{0.52,4.5,0.52});
     const mat4 parent=translation({0,20.65,0});

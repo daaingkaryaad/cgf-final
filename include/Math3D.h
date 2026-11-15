@@ -54,9 +54,14 @@ inline mat4 identity() {
 inline mat4 multiply(const mat4& a, const mat4& b) {
     mat4 result{};
     for (int col = 0; col < 4; ++col)
-        for (int row = 0; row < 4; ++row)
+        for (int row = 0; row < 4; ++row) {
+            double sum = 0.0;
             for (int k = 0; k < 4; ++k)
-                result[col * 4 + row] += a[k * 4 + row] * b[col * 4 + k];
+                sum += static_cast<double>(a[k * 4 + row]) * b[col * 4 + k];
+            if (!std::isfinite(sum) || std::abs(sum) > std::numeric_limits<float>::max())
+                throw std::runtime_error("matrix product exceeds float range");
+            result[col * 4 + row] = static_cast<float>(sum);
+        }
     return result;
 }
 
