@@ -103,6 +103,10 @@ void onClick(GLFWwindow* window,int button,int action,int) {
         captureMouse(window,true);
 }
 
+void onScroll(GLFWwindow* window,double,double y) {
+    state(window).camera.zoomChase(y);
+}
+
 void onFocus(GLFWwindow* window,int focused) {
     if (!focused) captureMouse(window,false);
 }
@@ -139,6 +143,7 @@ void run(GLFWwindow* window,const Options& settings) {
     glfwSetCursorPosCallback(window,onMouse);
     glfwSetMouseButtonCallback(window,onClick);
     glfwSetWindowFocusCallback(window,onFocus);
+    glfwSetScrollCallback(window,onScroll);
     Scene scene(settings.shaderDirectory);
     Hud hud(settings.shaderDirectory);
     if (settings.simulate>=0) { app.rocket.start(); app.rocket.update(settings.simulate); }
@@ -146,6 +151,7 @@ void run(GLFWwindow* window,const Options& settings) {
     int frameCount=0,totalFrames=0;
     std::cout<<"space launch | r reset scene | l pad light | h home camera | c camera mode\n"
              <<"wasd move | q/e down/up | shift faster | click/tab capture mouse\n"
+             <<"scroll zooms chase camera\n"
              <<"esc releases mouse; esc again closes the window\n";
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();

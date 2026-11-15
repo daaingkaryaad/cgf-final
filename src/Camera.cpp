@@ -14,6 +14,7 @@ Camera::Camera() { home(); }
 
 void Camera::home() {
     chasing_ = false;
+    chaseScale_ = 1.0;
     updateIgnitionShake(false,0.0);
     position_ = {26,17,32};
     const auto d = math3d::normalized(math3d::vec3{-1,6,0} - position_);
@@ -49,6 +50,12 @@ void Camera::toggleChase(const math3d::vec3& target) {
     if (chasing_) chaseTarget_ = target;
 }
 
+void Camera::zoomChase(double steps) {
+    if (!chasing_ || !std::isfinite(steps)) return;
+    const double bounded = std::max(-100.0, std::min(100.0, steps));
+    chaseScale_ = std::max(0.5, std::min(3.0, chaseScale_ * std::exp(-0.12 * bounded)));
+}
+
 void Camera::follow(const math3d::vec3& target, double dt) {
     if (!chasing_ || dt <= 0.0 || !std::isfinite(dt) || !finiteTarget(target)) return;
     // exponential smoothing gives the same response across frame intervals.
@@ -82,7 +89,7 @@ void Camera::updateIgnitionShake(bool igniting, double dt) {
 }
 
 math3d::vec3 Camera::position() const {
-    const auto base = chasing_ ? chaseTarget_ + chaseOffset : position_;
+    const auto base = chasing_ ? chaseTarget_ + chaseOffset * chaseScale_ : position_;
     return base + shakeOffset_;
 }
 

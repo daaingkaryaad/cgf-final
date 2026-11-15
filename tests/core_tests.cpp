@@ -92,6 +92,20 @@ void cameraTests() {
     const auto validChaseView = one.view();
     one.follow(invalidTarget,0.2);
     expect(one.view()==validChaseView,"invalid tracking target is ignored");
+    Camera zoom;
+    zoom.toggleChase(onPad);
+    const double defaultDistance = math3d::length(zoom.position()-onPad);
+    zoom.zoomChase(1);
+    expect(math3d::length(zoom.position()-onPad)<defaultDistance,"scroll zooms toward target");
+    zoom.zoomChase(1000);
+    expect(close(math3d::length(zoom.position()-onPad),defaultDistance*0.5),"zoom has minimum distance");
+    zoom.zoomChase(-1000);
+    expect(close(math3d::length(zoom.position()-onPad),defaultDistance*3),"zoom has maximum distance");
+    const auto zoomView = zoom.view();
+    zoom.zoomChase(std::numeric_limits<double>::infinity());
+    expect(zoom.view()==zoomView,"invalid zoom input is ignored");
+    zoom.home(); zoom.toggleChase(onPad);
+    expect(close(math3d::length(zoom.position()-onPad),defaultDistance),"home resets chase zoom");
     const auto initialChasePosition = one.position();
     const auto centered = math3d::transform_point(one.view(), onPad);
     expect(one.chasing() && close(centered.x,0) && close(centered.y,0) && centered.z<0,

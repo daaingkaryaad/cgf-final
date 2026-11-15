@@ -8,6 +8,7 @@ public:
     void look(double dx, double dy);
     void move(double forward, double right, double vertical, double dt, bool fast);
     void toggleChase(const math3d::vec3& target);
+    void zoomChase(double steps);
     void follow(const math3d::vec3& target, double dt);
     void updateIgnitionShake(bool igniting, double dt);
     bool chasing() const { return chasing_; }
@@ -19,6 +20,7 @@ private:
     double yaw_ = 0.0, pitch_ = 0.0;
     bool chasing_ = false;
     math3d::vec3 chaseTarget_{0,0,0};
+    double chaseScale_ = 1.0;
     double shakeTime_ = 0.0;
     math3d::vec3 shakeOffset_{0,0,0};
 };
