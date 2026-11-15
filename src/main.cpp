@@ -115,7 +115,12 @@ bool down(GLFWwindow* window,int key) { return glfwGetKey(window,key)==GLFW_PRES
 
 void moveCamera(GLFWwindow* window,double dt) {
     if (!glfwGetWindowAttrib(window,GLFW_FOCUSED)) return;
-    state(window).camera.move(double(down(window,GLFW_KEY_W))-double(down(window,GLFW_KEY_S)),
+    auto& camera = state(window).camera;
+    if (camera.chasing()) {
+        camera.orbitChase((double(down(window,GLFW_KEY_RIGHT))-double(down(window,GLFW_KEY_LEFT)))*dt);
+        return;
+    }
+    camera.move(double(down(window,GLFW_KEY_W))-double(down(window,GLFW_KEY_S)),
         double(down(window,GLFW_KEY_D))-double(down(window,GLFW_KEY_A)),
         double(down(window,GLFW_KEY_E))-double(down(window,GLFW_KEY_Q)),dt,
         down(window,GLFW_KEY_LEFT_SHIFT)||down(window,GLFW_KEY_RIGHT_SHIFT));
@@ -151,7 +156,7 @@ void run(GLFWwindow* window,const Options& settings) {
     int frameCount=0,totalFrames=0;
     std::cout<<"space launch | r reset scene | l pad light | h home camera | c camera mode\n"
              <<"wasd move | q/e down/up | shift faster | click/tab capture mouse\n"
-             <<"scroll zooms chase camera\n"
+             <<"scroll zooms chase camera | left/right orbit\n"
              <<"esc releases mouse; esc again closes the window\n";
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();

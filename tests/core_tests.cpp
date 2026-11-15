@@ -106,6 +106,20 @@ void cameraTests() {
     expect(zoom.view()==zoomView,"invalid zoom input is ignored");
     zoom.home(); zoom.toggleChase(onPad);
     expect(close(math3d::length(zoom.position()-onPad),defaultDistance),"home resets chase zoom");
+    Camera orbit;
+    orbit.toggleChase(onPad);
+    const auto orbitStart = orbit.position();
+    orbit.orbitChase(math3d::pi/2);
+    expect(math3d::length(orbit.position()-orbitStart)>1,"orbit changes viewing angle");
+    expect(close(math3d::length(orbit.position()-onPad),math3d::length(orbitStart-onPad)),"orbit preserves distance");
+    const auto orbitCenter = math3d::transform_point(orbit.view(),onPad);
+    expect(close(orbitCenter.x,0) && close(orbitCenter.y,0) && orbitCenter.z<0,"orbit keeps target centered");
+    orbit.orbitChase(-math3d::pi/2);
+    expect(math3d::length(orbit.position()-orbitStart)<1e-5,"inverse orbit restores position");
+    orbit.orbitChase(std::numeric_limits<double>::max());
+    expect(std::isfinite(orbit.position().x),"large orbit angle stays finite");
+    orbit.home(); orbit.toggleChase(onPad);
+    expect(math3d::length(orbit.position()-orbitStart)<1e-5,"home resets orbit");
     const auto initialChasePosition = one.position();
     const auto centered = math3d::transform_point(one.view(), onPad);
     expect(one.chasing() && close(centered.x,0) && close(centered.y,0) && centered.z<0,
