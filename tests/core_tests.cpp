@@ -3,6 +3,7 @@
 #include "Rocket.h"
 #include <array>
 #include <cmath>
+#include <functional>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -248,6 +249,30 @@ void boosterImpactTests() {
 
 void transformTests() {
     using namespace math3d;
+    const double largest = std::numeric_limits<double>::max();
+    const double smallest = std::numeric_limits<double>::denorm_min();
+    const auto largeUnit = normalized({largest,largest,0});
+    const auto smallUnit = normalized({smallest,smallest,0});
+    expect(close(length(largeUnit),1) && close(largeUnit.x,std::sqrt(0.5)),"large vectors normalize safely");
+    expect(close(length(smallUnit),1) && close(smallUnit.x,std::sqrt(0.5)),"subnormal vectors normalize safely");
+    const auto poleView = look_at({0,0,0},{0,1,0},{0,1,0});
+    const auto poleTarget = transform_point(poleView,{0,1,0});
+    expect(close(poleTarget.x,0) && close(poleTarget.y,0) && close(poleTarget.z,-1),
+           "parallel up vector uses a stable camera basis");
+    const auto oppositeView = look_at({0,0,0},{0,-1,0},{0,1,0});
+    const auto oppositeTarget = transform_point(oppositeView,{0,-1,0});
+    expect(close(oppositeTarget.x,0) && close(oppositeTarget.y,0) && close(oppositeTarget.z,-1),
+           "opposite up vector uses a stable camera basis");
+    mat4 lhs{}, rhs{};
+    const float maxFloat = std::numeric_limits<float>::max();
+    lhs[0] = maxFloat; lhs[4] = maxFloat;
+    rhs[0] = 2; rhs[1] = -2;
+    expect(multiply(lhs,rhs)[0]==0.0f,"matrix product avoids intermediate float overflow");
+    rhs[1] = 0;
+    bool rejected = false;
+    try { multiply(lhs,rhs); } catch (const std::runtime_error&) { rejected = true; }
+    expect(rejected,"matrix product rejects unrepresentable output");
+    expect(multiply(identity(),identity())==identity(),"matrix multiplication preserves identity");
     const vec3 localPoint{0.4,1,0};
     const mat4 child=transform({1.38,3.4,0},{0.52,4.5,0.52});
     const mat4 parent=translation({0,20.65,0});
@@ -261,6 +286,33 @@ void transformTests() {
     expect(length(bottom-vec3{1,2,3})<1e-5 && length(top-vec3{4,7,9})<1e-5,"beam endpoints");
 }
 
+void projectionTests() {
+    using namespace math3d;
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const auto validPerspective = perspective(pi/3, 16.0/9.0, 0.1, 1000.0);
+    const auto validOrtho = orthographic(-5,5,-4,4,0.1,1000.0);
+    for (float value : validPerspective) expect(std::isfinite(value),"valid perspective is finite");
+    for (float value : validOrtho) expect(std::isfinite(value),"valid orthographic matrix is finite");
+    const auto invalid = [](const std::function<void()>& function) {
+        try { function(); } catch (const std::runtime_error&) { return true; }
+        return false;
+    };
+    expect(invalid([&]{ perspective(pi/3,1e-100,0.1,100); }),"perspective rejects float overflow");
+    expect(invalid([&]{ perspective(pi/3,1e100,0.1,100); }),"perspective rejects zero horizontal scale");
+    expect(invalid([&]{ orthographic(0,1e100,-5,5,0.1,100); }),"orthographic rejects zero horizontal scale");
+    expect(invalid([&]{ orthographic(-5,5,-5,5,0.1,1e100); }),"orthographic rejects zero depth scale");
+    expect(invalid([&]{ orthographic(0,1e-100,-5,5,0.1,100); }),"orthographic rejects float overflow");
+    const auto distant = perspective(pi/3,1,0.1,std::numeric_limits<double>::max());
+    expect(close(distant[10],-1) && close(distant[14],-0.2),"large far plane avoids intermediate overflow");
+    expect(invalid([&]{ perspective(nan,1,0.1,100); }),"perspective rejects NaN angle");
+    expect(invalid([&]{ perspective(pi/3,infinity,0.1,100); }),"perspective rejects infinite aspect");
+    expect(invalid([&]{ perspective(pi/3,1,0.1,infinity); }),"perspective rejects infinite far plane");
+    expect(invalid([&]{ orthographic(nan,5,-5,5,0.1,100); }),"orthographic rejects NaN bound");
+    expect(invalid([&]{ orthographic(-5,infinity,-5,5,0.1,100); }),"orthographic rejects infinite bound");
+    expect(invalid([&]{ orthographic(-5,5,-5,5,0.1,infinity); }),"orthographic rejects infinite far plane");
+}
+
 void cameraTests() {
     Camera one,many;
     one.move(1,0,0,1,false);
@@ -270,6 +322,28 @@ void cameraTests() {
     expect(one.position().y>=0.8,"camera cannot descend below ground");
     one.look(1e6,1e6);
     for (float f:one.view()) expect(std::isfinite(f),"extreme mouse input keeps view finite");
+    const auto safePosition = one.position();
+    const auto safeView = one.view();
+    one.move(1,0,0,-1,false);
+    one.move(1,0,0,std::numeric_limits<double>::quiet_NaN(),false);
+    one.move(std::numeric_limits<double>::infinity(),0,0,1,false);
+    one.move(0,std::numeric_limits<double>::quiet_NaN(),0,1,false);
+    expect(one.position().x==safePosition.x && one.position().y==safePosition.y &&
+           one.position().z==safePosition.z,"invalid camera movement is ignored");
+    one.look(std::numeric_limits<double>::quiet_NaN(),0);
+    one.look(0,std::numeric_limits<double>::infinity());
+    expect(one.view()==safeView,"invalid mouse movement is ignored");
+    Camera huge, bounded;
+    huge.move(std::numeric_limits<double>::max(),0,0,0.1,false);
+    bounded.move(1,0,0,0.1,false);
+    expect(math3d::length(huge.position()-bounded.position())<1e-5,"movement axes are bounded");
+    const auto beforeOverflow = huge.position();
+    huge.move(1,0,0,std::numeric_limits<double>::max(),true);
+    expect(math3d::length(huge.position()-beforeOverflow)<1e-5,"overflowing movement is ignored");
+    huge.look(std::numeric_limits<double>::max(),0);
+    const auto hugeView = huge.view();
+    huge.look(100,0);
+    expect(huge.view()!=hugeView,"mouse remains responsive after huge yaw input");
     one.home(); Camera initial;
     expect(math3d::length(one.position()-initial.position())<1e-5,"home restores camera");
 
@@ -364,7 +438,7 @@ void meshTest(const MeshData& mesh) {
 int main() {
     try {
         launchTests(); boosterTests(); boosterTimingTests(); boosterMotionTests(); boosterImpactTests();
-        transformTests(); cameraTests();
+        transformTests(); cameraTests(); projectionTests();
         meshTest(geometry::box()); meshTest(geometry::plane());
         meshTest(geometry::frustum(1)); meshTest(geometry::frustum(0)); meshTest(geometry::frustum(0.58f));
         std::cout<<checks<<" checks passed: launch, hierarchy, camera, geometry\n";

@@ -1,7 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 
 namespace math3d {
@@ -36,11 +38,12 @@ inline double length(const vec3& a) {
     return std::hypot(std::hypot(a.x, a.y), a.z);
 }
 inline vec3 normalized(const vec3& a) {
-    const double n = length(a);
-    if (!(n > 0.0) || !std::isfinite(n)) {
-        throw std::runtime_error("cannot normalize a zero or non-finite vector");
-    }
-    return a / n;
+    if (!std::isfinite(a.x) || !std::isfinite(a.y) || !std::isfinite(a.z))
+        throw std::runtime_error("cannot normalize a non-finite vector");
+    const double scale = std::max(std::abs(a.x), std::max(std::abs(a.y), std::abs(a.z)));
+    if (!(scale > 0.0)) throw std::runtime_error("cannot normalize a zero vector");
+    const vec3 scaled = a / scale;
+    return scaled / length(scaled);
 }
 
 using mat4 = std::array<float, 16>;
@@ -51,15 +54,28 @@ inline mat4 identity() {
 inline mat4 multiply(const mat4& a, const mat4& b) {
     mat4 result{};
     for (int col = 0; col < 4; ++col)
-        for (int row = 0; row < 4; ++row)
+        for (int row = 0; row < 4; ++row) {
+            double sum = 0.0;
             for (int k = 0; k < 4; ++k)
-                result[col * 4 + row] += a[k * 4 + row] * b[col * 4 + k];
+                sum += static_cast<double>(a[k * 4 + row]) * b[col * 4 + k];
+            if (!std::isfinite(sum) || std::abs(sum) > std::numeric_limits<float>::max())
+                throw std::runtime_error("matrix product exceeds float range");
+            result[col * 4 + row] = static_cast<float>(sum);
+        }
     return result;
 }
 
 inline mat4 look_at(const vec3& eye, const vec3& target, const vec3& up) {
     const vec3 forward = normalized(target - eye);
-    const vec3 right = normalized(cross(forward, up));
+    // Normalize the up hint before testing alignment, so its magnitude
+    // does not affect the camera basis. Choose a fallback at the poles.
+    const vec3 up_hint = normalized(up);
+    vec3 side = cross(forward, up_hint);
+    if (length(side) < 1e-8) {
+        const vec3 fallback = std::abs(forward.y) < 0.9 ? vec3{0,1,0} : vec3{1,0,0};
+        side = cross(forward, fallback);
+    }
+    const vec3 right = normalized(side);
     const vec3 camera_up = cross(right, forward);
     mat4 result = identity();
     result[0] = static_cast<float>(right.x);
@@ -77,30 +93,51 @@ inline mat4 look_at(const vec3& eye, const vec3& target, const vec3& up) {
     return result;
 }
 
+inline float projection_value(double value) {
+    if (!std::isfinite(value) || std::abs(value) > std::numeric_limits<float>::max())
+        throw std::runtime_error("projection coefficient exceeds float range");
+    return static_cast<float>(value);
+}
+
+// A zero scale makes a projection singular even when all values are finite.
+inline float projection_scale(double value) {
+    const float scale = projection_value(value);
+    if (scale == 0.0f)
+        throw std::runtime_error("projection scale underflows float range");
+    return scale;
+}
+
 inline mat4 perspective(double fovy, double aspect, double near_z, double far_z) {
-    if (!(fovy > 0 && fovy < pi && aspect > 0 && near_z > 0 && far_z > near_z))
+    if (!std::isfinite(fovy) || !std::isfinite(aspect) ||
+        !std::isfinite(near_z) || !std::isfinite(far_z) ||
+        !(fovy > 0 && fovy < pi && aspect > 0 && near_z > 0 && far_z > near_z))
         throw std::runtime_error("invalid perspective parameters");
     const double f = 1.0 / std::tan(fovy * 0.5);
     mat4 result{};
-    result[0] = static_cast<float>(f / aspect);
-    result[5] = static_cast<float>(f);
-    result[10] = static_cast<float>((far_z + near_z) / (near_z - far_z));
+    result[0] = projection_scale(f / aspect);
+    result[5] = projection_scale(f);
+    result[10] = projection_value(-1.0 - 2.0 * (near_z / (far_z - near_z)));
     result[11] = -1.0f;
-    result[14] = static_cast<float>(2.0 * far_z * near_z / (near_z - far_z));
+    result[14] = projection_value(-2.0 * (near_z / (far_z - near_z)) * far_z);
     return result;
 }
 
 inline mat4 orthographic(double left, double right, double bottom, double top,
                          double near_z, double far_z) {
-    if (!(right > left && top > bottom && near_z > 0 && far_z > near_z))
+    if (!std::isfinite(left) || !std::isfinite(right) ||
+        !std::isfinite(bottom) || !std::isfinite(top) ||
+        !std::isfinite(near_z) || !std::isfinite(far_z) ||
+        !(right > left && top > bottom && near_z > 0 && far_z > near_z))
         throw std::runtime_error("invalid orthographic parameters");
+    if (!std::isfinite(right-left) || !std::isfinite(top-bottom))
+        throw std::runtime_error("orthographic extent exceeds double range");
     mat4 result = identity();
-    result[0] = static_cast<float>(2.0 / (right - left));
-    result[5] = static_cast<float>(2.0 / (top - bottom));
-    result[10] = static_cast<float>(-2.0 / (far_z - near_z));
-    result[12] = static_cast<float>(-(right + left) / (right - left));
-    result[13] = static_cast<float>(-(top + bottom) / (top - bottom));
-    result[14] = static_cast<float>(-(far_z + near_z) / (far_z - near_z));
+    result[0] = projection_scale(2.0 / (right - left));
+    result[5] = projection_scale(2.0 / (top - bottom));
+    result[10] = projection_scale(-2.0 / (far_z - near_z));
+    result[12] = projection_value(-(right / (right - left) + left / (right - left)));
+    result[13] = projection_value(-(top / (top - bottom) + bottom / (top - bottom)));
+    result[14] = projection_value(-1.0 - 2.0 * (near_z / (far_z - near_z)));
     return result;
 }
 
