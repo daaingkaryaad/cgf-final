@@ -5,11 +5,13 @@ using math3d::vec3;
 namespace {
 const vec3 cream{0.87,0.86,0.77}, orange{0.82,0.25,0.085}, dark{0.12,0.18,0.18};
 const vec3 steel{0.27,0.34,0.33}, yellow{0.78,0.53,0.14};
+constexpr vec3 coreOutlet{0,0.263,0}, boosterOutlet{0,0.08,0};
 }
 
 Scene::Scene(const std::string& directory)
     : shader_(directory+"/basic.vert",directory+"/basic.frag"),
-      sky_(directory+"/sky.vert",directory+"/sky.frag") {
+      sky_(directory+"/sky.vert",directory+"/sky.frag"),
+      exhaust_(directory) {
     meshes_[box].reset(new Mesh(geometry::box()));
     meshes_[plane].reset(new Mesh(geometry::plane()));
     meshes_[cylinder].reset(new Mesh(geometry::frustum(1.0f)));
@@ -118,6 +120,17 @@ void Scene::draw(const Part& part, const math3d::mat4& parent) {
     meshes_[part.shape]->draw();
 }
 
+void Scene::updateExhaust(const Rocket& rocket, double dt) {
+    ParticleSystem::Outlets outlets{};
+    outlets[0] = math3d::transform_point(rocket.model(),coreOutlet);
+    std::size_t activeOutlets = 1;
+    if (!rocket.boostersSeparated()) {
+        for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+            outlets[activeOutlets++] = math3d::transform_point(rocket.boosterModel(i),boosterOutlet);
+    }
+    exhaust_.update(dt,outlets,rocket.enginesOn(),activeOutlets);
+}
+
 void Scene::drawBoosters(const Rocket& rocket) {
     if (!rocket.boostersVisible()) return;
     const bool showGlow = rocket.enginesOn() && !rocket.boostersSeparated();
@@ -170,4 +183,5 @@ void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
                         {1,0.55,0.12},0,0,true};
         draw(coreNozzle,coreModel);
     }
+    exhaust_.render(view,projection);
 }
