@@ -18,6 +18,8 @@ public:
     math3d::mat4 model() const;
     bool boostersSeparated() const;
     bool boostersVisible() const;
+    // Returns the world pose, including after impact. Throws std::out_of_range
+    // if index is outside [0, boosterCount).
     math3d::mat4 boosterModel(std::size_t index) const;
 private:
     Stage stage_ = Stage::ready;

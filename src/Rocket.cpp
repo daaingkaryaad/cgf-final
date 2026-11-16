@@ -1,6 +1,7 @@
 #include "Rocket.h"
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 
 namespace {
 constexpr double padHeight = 0.65;
@@ -130,6 +131,9 @@ bool Rocket::boostersVisible() const {
 }
 
 math3d::mat4 Rocket::boosterModel(std::size_t index) const {
+    if (index >= boosterCount)
+        throw std::out_of_range("Rocket::boosterModel: index must be less than boosterCount");
+
     using namespace math3d;
     const double angle = index*(2.0*pi/boosterCount);
     const vec3 outward{std::cos(angle),0,std::sin(angle)};

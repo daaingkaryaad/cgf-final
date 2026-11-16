@@ -120,6 +120,44 @@ void boosterTests() {
         expect(rocket.boosterModel(i)==fresh.boosterModel(i),"relaunch does not retain previous booster motion");
 }
 
+void boosterIndexTests() {
+    Rocket rocket, ready;
+    const auto verifyIndices = [&rocket]() {
+        for (const auto invalid : {Rocket::boosterCount,std::numeric_limits<std::size_t>::max()}) {
+            bool rejected = false;
+            try {
+                rocket.boosterModel(invalid);
+            } catch (const std::out_of_range&) {
+                rejected = true;
+            }
+            expect(rejected,"out-of-range booster indices are rejected");
+        }
+        for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+            const auto pose = rocket.boosterModel(i);
+            for (const auto value : pose)
+                expect(std::isfinite(value),"valid booster indices produce finite transforms");
+        }
+    };
+    verifyIndices();
+    rocket.start();
+    rocket.update(15.0);
+    expect(rocket.boostersSeparated() && rocket.boostersVisible(),"index validation exercises detached flight");
+    const Rocket detached = rocket;
+    verifyIndices();
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+        expect(rocket.boosterModel(i)==detached.boosterModel(i),"invalid queries leave detached motion unchanged");
+    rocket.update(10.0);
+    expect(!rocket.boostersVisible(),"index validation exercises the impact pose");
+    verifyIndices();
+    rocket.reset();
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+        expect(rocket.boosterModel(i)==ready.boosterModel(i),"reset restores all valid mount transforms");
+    rocket.start();
+    rocket.update(15.0);
+    for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+        expect(rocket.boosterModel(i)==detached.boosterModel(i),"relaunch restores all valid detached transforms");
+}
+
 void boosterTimingTests() {
     using namespace math3d;
     const double release = 4.2+std::sqrt(2.0*54.0/1.1);
@@ -294,7 +332,7 @@ void meshTest(const MeshData& mesh) {
 
 int main() {
     try {
-        launchTests(); boosterTests(); boosterTimingTests(); boosterMotionTests(); boosterImpactTests();
+        launchTests(); boosterTests(); boosterIndexTests(); boosterTimingTests(); boosterMotionTests(); boosterImpactTests();
         transformTests(); cameraTests();
         meshTest(geometry::box()); meshTest(geometry::plane());
         meshTest(geometry::frustum(1)); meshTest(geometry::frustum(0)); meshTest(geometry::frustum(0.58f));
