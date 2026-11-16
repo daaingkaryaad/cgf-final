@@ -1,6 +1,7 @@
 #include "Camera.h"
 #include "Geometry.h"
 #include "Rocket.h"
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <iostream>
@@ -207,9 +208,6 @@ void boosterMotionTests() {
     expect(length(transform_point(smooth.boosterModel(0),tip)-center-releaseTip)<0.0001,
            "tumble eases in from the attached orientation");
 
-    Rocket stepped;
-    stepped.start();
-    stepped.update(release);
     double previousRadius = releaseCenter.x;
     for (double age : {0.25, 1.0, 2.0, 3.0, 3.6}) {
         Rocket coarse;
@@ -228,16 +226,6 @@ void boosterMotionTests() {
                               transform_point(quarterTurn,transform_point(first,point)))<1e-5,
                        "each booster follows the same motion rotated by its mounting angle");
         }
-    }
-    for (int frame=0; frame<192; ++frame) stepped.update(1.0/64.0);
-    Rocket coarse;
-    coarse.start();
-    coarse.update(release+3.0);
-    for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
-        for (const auto& point : {pivot,tip,fin})
-            expect(length(transform_point(stepped.boosterModel(i),point)-
-                          transform_point(coarse.boosterModel(i),point))<1e-5,
-                   "small updates and one coarse update produce the same detached pose");
     }
 }
 
@@ -282,6 +270,67 @@ void boosterImpactTests() {
     expect(fine.boostersVisible(),"relaunch restores the full descent before the next impact");
     fine.update(0.15);
     expect(!fine.boostersVisible(),"relaunch reaches ground impact again");
+}
+
+void boosterFrameRateTests() {
+    using namespace math3d;
+    const double release = 4.2+std::sqrt(2.0*54.0/1.1);
+    const vec3 pivot{0,3.2,0}, tip{0,6.65,0}, fin{0.8,1.2,0};
+    const Rocket pad;
+    // Shared sample times expressed as frame numbers at 30 FPS.
+    const std::array<int,7> checkpoints{{210,423,424,450,525,535,540}};
+    std::array<Rocket,checkpoints.size()> firstLaunch;
+    double impactAfter = 0.0, impactBy = 18.0;
+    for (int fps : {30,60,120}) {
+        Rocket rocket;
+        int firstReleaseFrame = 0, firstImpactFrame = 0;
+        for (int launch=0; launch<2; ++launch) {
+            rocket.reset();
+            for (std::size_t i=0; i<Rocket::boosterCount; ++i)
+                expect(rocket.boosterModel(i)==pad.boosterModel(i),"reset restores each booster at every frame rate");
+            rocket.start();
+            int releaseFrame = 0, impactFrame = 0;
+            std::size_t sample = 0;
+            for (int frame=1; frame<=18*fps; ++frame) {
+                rocket.update(1.0/fps);
+                if (!releaseFrame && rocket.boostersSeparated()) releaseFrame = frame;
+                if (!impactFrame && !rocket.boostersVisible()) impactFrame = frame;
+                if (sample==checkpoints.size() || frame!=checkpoints[sample]*(fps/30)) continue;
+
+                Rocket reference;
+                reference.start();
+                reference.update(checkpoints[sample]/30.0);
+                expect(rocket.boostersSeparated()==reference.boostersSeparated() &&
+                       rocket.boostersVisible()==reference.boostersVisible(),
+                       "booster state agrees at the same simulated time");
+                for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
+                    const auto pose = rocket.boosterModel(i);
+                    const auto referencePose = reference.boosterModel(i);
+                    for (const auto& point : {pivot,tip,fin})
+                        expect(length(transform_point(pose,point)-
+                                      transform_point(referencePose,point))<1e-5,
+                               "all booster centers, tips and fins agree across frame rates");
+                    if (launch==1)
+                        expect(pose==firstLaunch[sample].boosterModel(i),"relaunch repeats each sampled pose exactly");
+                }
+                if (launch==0) firstLaunch[sample] = rocket;
+                ++sample;
+            }
+            expect(sample==firstLaunch.size(),"all trajectory checkpoints are sampled");
+            expect(releaseFrame==int(std::ceil(release*fps)),"separation is first observed in the frame containing release");
+            expect(impactFrame>releaseFrame,"impact is observed after separation");
+            if (launch==0) {
+                firstReleaseFrame = releaseFrame;
+                firstImpactFrame = impactFrame;
+                impactAfter = std::max(impactAfter,double(impactFrame-1)/fps);
+                impactBy = std::min(impactBy,double(impactFrame)/fps);
+            } else {
+                expect(releaseFrame==firstReleaseFrame && impactFrame==firstImpactFrame,
+                       "relaunch repeats the release and impact frames");
+            }
+        }
+    }
+    expect(impactAfter<impactBy,"all frame rates place impact in the same simulation time interval");
 }
 
 void transformTests() {
@@ -333,7 +382,7 @@ void meshTest(const MeshData& mesh) {
 int main() {
     try {
         launchTests(); boosterTests(); boosterIndexTests(); boosterTimingTests(); boosterMotionTests(); boosterImpactTests();
-        transformTests(); cameraTests();
+        boosterFrameRateTests(); transformTests(); cameraTests();
         meshTest(geometry::box()); meshTest(geometry::plane());
         meshTest(geometry::frustum(1)); meshTest(geometry::frustum(0)); meshTest(geometry::frustum(0.58f));
         std::cout<<checks<<" checks passed: launch, hierarchy, camera, geometry\n";

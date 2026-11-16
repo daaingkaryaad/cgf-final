@@ -35,6 +35,8 @@ For booster index `i`, let `theta = i * pi / 2` and
 cardinal directions in the XZ plane. While attached, `Rocket::boosterModel(i)`
 returns the world matrix `coreModel * T(1.38 * d) * Ry(-theta)`. The yaw
 points each fin away from the core.
+The valid indices are 0 through 3. Other indices throw `std::out_of_range`
+in every flight state.
 
 After release, let `a` be seconds since separation and
 `e = a² / (a + 0.12)`. The center moves along `d` at radius
@@ -67,6 +69,24 @@ so there is no separate render state to reset.
 
 ## Verify and demo
 
+`boosterFrameRateTests()` runs two launches at each of 30, 60, and 120 FPS
+using fixed steps of `1 / FPS` seconds. At shared simulated times it compares
+the center, nose tip, and fin of each booster to a single update to that time,
+with a tolerance of `1e-5` scene units. The samples cover attached ascent,
+release, outward drift, the fall after core shutdown, and the pose at impact.
+After reset, the pad and sampled flight transforms match exactly on replay at
+the same frame rate.
+
+The first observed release frame contains the calculated release time of
+about 14.11 seconds at each rate. The three impact intervals overlap from
+just after 17.8333 seconds through about 17.8417 seconds.
+
+| FPS | First separated frame | First hidden frame |
+| --- | ---: | ---: |
+| 30 | 424 | 536 |
+| 60 | 847 | 1071 |
+| 120 | 1694 | 2141 |
+
 1. Run `make test`. The booster checks cover all four mount positions and
    fin directions, attachment, exact release and pose continuity, long
    updates, symmetry, smooth and monotonic outward motion, frame partitioning,
@@ -92,7 +112,8 @@ so there is no separate render state to reset.
    ```
 
 AI assistance disclosure: OpenAI Codex inspected the existing booster
-implementation, made the follow-up changes to the animation, terrain contact,
-and booster details, added tests, ran the build and verification commands, and
+implementation, made follow-up changes to animation, terrain contact,
+booster details, and index validation, added tests including the frame-rate
+comparison, ran the build and verification commands, and
 updated this document. The original booster implementation and the rest of the
 team's project were already present.
