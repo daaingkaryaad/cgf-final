@@ -1,6 +1,7 @@
 #pragma once
 #include "Shader.h"
 #include <array>
+#include <cstddef>
 #include <random>
 #include <vector>
 
@@ -13,7 +14,7 @@ public:
     ParticleSystem(const ParticleSystem&) = delete;
     ParticleSystem& operator=(const ParticleSystem&) = delete;
 
-    void update(double dt, const Outlets& outlets, bool firing);
+    void update(double dt, const Outlets& outlets, bool firing, std::size_t activeOutlets=5);
     void render(const math3d::mat4& view, const math3d::mat4& projection);
     void reset();
 
@@ -30,7 +31,7 @@ private:
         float angle, seed, depth;
     };
 
-    void emit(double dt, const Outlets& outlets, bool smoke);
+    void emit(double dt, const Outlets& outlets, std::size_t activeOutlets, bool smoke);
     void drawPass(const math3d::mat4& view, bool smoke);
 
     Shader shader_;

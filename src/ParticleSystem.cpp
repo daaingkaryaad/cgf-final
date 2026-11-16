@@ -40,16 +40,15 @@ void ParticleSystem::reset() {
     random_.seed(451);
 }
 
-void ParticleSystem::emit(double dt, const Outlets& outlets, bool smoke) {
+void ParticleSystem::emit(double dt, const Outlets& outlets, std::size_t activeOutlets, bool smoke) {
     double& carry = smoke ? smokeCarry_ : fireCarry_;
     carry += dt * (smoke ? 30.0 : 76.0);
     const int count = static_cast<int>(carry);
     carry -= count;
 
-    for (std::size_t engine=0; engine<outlets.size(); ++engine) {
+    for (std::size_t engine=0; engine<activeOutlets; ++engine) {
         const auto movement = outlets[engine]-previousOutlets_[engine];
         for (int i=0; i<count && particles_.size()<maxParticles; ++i) {
-            // distribute births along the engine's path during this frame.
             const double along = (i+unit_(random_))/count;
             const auto origin = previousOutlets_[engine]+movement*along;
             const double angle = 2.0*math3d::pi*unit_(random_);
@@ -71,7 +70,7 @@ void ParticleSystem::emit(double dt, const Outlets& outlets, bool smoke) {
     }
 }
 
-void ParticleSystem::update(double dt, const Outlets& outlets, bool firing) {
+void ParticleSystem::update(double dt, const Outlets& outlets, bool firing, std::size_t activeOutlets) {
     if (dt<=0.0 || !std::isfinite(dt)) return;
     dt = std::min(dt,0.05);
     for (auto& p : particles_) {
@@ -87,14 +86,15 @@ void ParticleSystem::update(double dt, const Outlets& outlets, bool firing) {
         return p.age>=p.lifetime;
     }),particles_.end());
 
-    if (!firing) {
+    if (!firing || activeOutlets==0) {
         fireCarry_ = smokeCarry_ = 0.0;
         emitting_ = false;
         return;
     }
     if (!emitting_) previousOutlets_ = outlets;
-    emit(dt,outlets,false);
-    emit(dt,outlets,true);
+    activeOutlets = std::min(activeOutlets,outlets.size());
+    emit(dt,outlets,activeOutlets,false);
+    emit(dt,outlets,activeOutlets,true);
     previousOutlets_ = outlets;
     emitting_ = true;
 }
@@ -136,7 +136,6 @@ void ParticleSystem::render(const math3d::mat4& view, const math3d::mat4& projec
     shader_.matrix("projection",projection);
     glBindVertexArray(vao_);
     glBindBuffer(GL_ARRAY_BUFFER,vbo_);
-    // keep opaque-scene depth testing and leave the depth buffer intact.
     glDepthMask(GL_FALSE);
     glDisable(GL_CULL_FACE);
     glEnable(GL_BLEND);
