@@ -59,7 +59,6 @@ State& state(GLFWwindow* window) {
 }
 
 math3d::vec3 rocketCameraTarget(const Rocket& rocket) {
-    // aim near the midpoint of the rocket in its current world position.
     return math3d::transform_point(rocket.model(), {0,5.5,0});
 }
 

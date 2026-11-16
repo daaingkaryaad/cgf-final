@@ -40,7 +40,6 @@ void main() {
     float distanceToEye = length(eyePosition-worldPosition);
     float dayFog = 1.0-exp(-0.0016*distanceToEye);
     vec3 daylight = mix(colour,vec3(0.69,0.73,0.68),dayFog);
-    // blend distant terrain into the dark horizon, keeping the nearby rocket lit.
     vec3 highAltitude = mix(colour,darkHorizon,smoothstep(30.0,180.0,distanceToEye));
     colour = mix(daylight,highAltitude,skyDarkness);
     fragmentColour = vec4(clamp(colour,0.0,1.0),1.0);

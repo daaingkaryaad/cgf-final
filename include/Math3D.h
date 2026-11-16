@@ -67,8 +67,6 @@ inline mat4 multiply(const mat4& a, const mat4& b) {
 
 inline mat4 look_at(const vec3& eye, const vec3& target, const vec3& up) {
     const vec3 forward = normalized(target - eye);
-    // Normalize the up hint before testing alignment, so its magnitude
-    // does not affect the camera basis. Choose a fallback at the poles.
     const vec3 up_hint = normalized(up);
     vec3 side = cross(forward, up_hint);
     if (length(side) < 1e-8) {
@@ -99,7 +97,6 @@ inline float projection_value(double value) {
     return static_cast<float>(value);
 }
 
-// A zero scale makes a projection singular even when all values are finite.
 inline float projection_scale(double value) {
     const float scale = projection_value(value);
     if (scale == 0.0f)
@@ -170,7 +167,6 @@ inline vec3 transform_point(const mat4& m, const vec3& p) {
             m[2]*p.x + m[6]*p.y + m[10]*p.z + m[14]};
 }
 
-// align a unit-height box's local y axis with the segment from a to b.
 inline mat4 beam(const vec3& a, const vec3& b, double width) {
     const vec3 y = normalized(b - a);
     const vec3 helper = std::abs(y.y) > 0.95 ? vec3{1,0,0} : vec3{0,1,0};

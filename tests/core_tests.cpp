@@ -226,7 +226,6 @@ void boosterImpactTests() {
            coarse.stage()==Rocket::Stage::complete && close(coarse.altitude(),90) && close(coarse.velocity(),0),
            "an update spanning impact leaves the finished core intact");
     const auto groundRim = [](const mat4& pose) {
-        // Near contact the tilted upper shell rim is the lowest part of the booster.
         return transform_point(pose,{0,5.65,0}).y-0.52*std::hypot(pose[1],pose[9]);
     };
     for (std::size_t i=0; i<Rocket::boosterCount; ++i) {

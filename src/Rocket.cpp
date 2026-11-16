@@ -11,7 +11,7 @@ constexpr double maximumAltitude = 90.0;
 constexpr double separationHeight = 54.0;
 constexpr double boosterOffset = 1.38;
 constexpr double boosterPivot = 3.2;
-constexpr double terrainHeight = -0.025; // Ground plane in Scene::buildSite.
+constexpr double terrainHeight = -0.025; 
 constexpr double boosterGravity = 14.0;
 constexpr double releaseRamp = 0.12;
 constexpr double driftSpeed = 4.5;
@@ -44,14 +44,12 @@ math3d::mat4 boosterTumble(double easedAge) {
 }
 
 double boosterGroundClearance(double age) {
-    // Facing yaw leaves height unchanged, so one local envelope fits all four boosters.
     const auto tumble = boosterTumble(easedFlightAge(age));
     const double x = tumble[1], y = tumble[5], z = tumble[9];
     const double radial = std::hypot(x,z);
     const auto cylinderBottom = [=](double base, double top, double radius) {
         return std::min((base-boosterPivot)*y,(top-boosterPivot)*y)-radius*radial;
     };
-    // The envelopes cover the nozzle, skirt, shell with trim, nose tip, and outer fin.
     const double finBottom = 0.49*x+(1.2-boosterPivot)*y
                            -0.325*std::abs(x)-0.625*std::abs(y)-0.05*std::abs(z);
     const double lowest = std::min({cylinderBottom(0.09,0.51,0.32),
@@ -62,7 +60,6 @@ double boosterGroundClearance(double age) {
 }
 
 double impactAge() {
-    // On the way down, bracket contact between the apex and the pivot reaching ground.
     double above = releaseSpeed/boosterGravity;
     double below = (releaseSpeed+std::sqrt(releaseSpeed*releaseSpeed+
                    2.0*boosterGravity*(releaseCenterHeight-terrainHeight)))/boosterGravity;
@@ -90,7 +87,6 @@ void Rocket::reset() {
 
 void Rocket::update(double dt) {
     if (stage_ == Stage::ready || dt <= 0.0 || !std::isfinite(dt)) return;
-    // Use one clock for event boundaries; keep it running after the core stops.
     const double remaining = launchEndsAt-launchElapsed_;
     launchElapsed_ = dt >= remaining ? launchEndsAt : launchElapsed_+dt;
     if (launchElapsed_ < countdownDuration) {
@@ -138,7 +134,6 @@ math3d::mat4 Rocket::boosterModel(std::size_t index) const {
         return multiply(model(),multiply(translation(outward*boosterOffset),facing));
     }
 
-    // Radial and angular speeds start at zero and ease toward their steady rates.
     const double age = std::min(launchElapsed_-separationAt,boosterImpactAge);
     const double easedAge = easedFlightAge(age);
     const vec3 center = outward*(boosterOffset+driftSpeed*easedAge)+vec3{0,boosterCenterHeight(age),0};

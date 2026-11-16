@@ -36,7 +36,6 @@ void Camera::look(double dx, double dy) {
 void Camera::move(double forward, double right, double vertical, double dt, bool fast) {
     if (chasing_ || !(dt > 0.0) || !std::isfinite(dt) ||
         !std::isfinite(forward) || !std::isfinite(right) || !std::isfinite(vertical)) return;
-    // Inputs are signed movement axes, not arbitrary velocities.
     const auto axis = [](double value) { return std::max(-1.0, std::min(1.0, value)); };
     forward = axis(forward);
     right = axis(right);
@@ -60,9 +59,7 @@ void Camera::toggleChase(const math3d::vec3& target) {
 
 void Camera::follow(const math3d::vec3& target, double dt) {
     if (!chasing_ || dt <= 0.0 || !std::isfinite(dt) || !finiteTarget(target)) return;
-    // exponential smoothing gives the same response across frame intervals.
     const double blend = -std::expm1(-chaseResponse * dt);
-    // A convex combination avoids overflowing the difference between targets.
     const auto next = chaseTarget_ * (1.0 - blend) + target * blend;
     if (finiteTarget(next)) chaseTarget_ = next;
 }
@@ -74,15 +71,12 @@ void Camera::updateIgnitionShake(bool igniting, double dt) {
         return;
     }
     if (dt <= 0.0 || !std::isfinite(dt)) return;
-    // Beyond this duration the vibration is negligible. Saturation also
-    // prevents huge elapsed times from overflowing the oscillator phase.
     constexpr double shakeDuration = 5.0;
     shakeTime_ = std::min(shakeDuration, shakeTime_ + std::min(dt, shakeDuration));
     if (shakeTime_ >= shakeDuration) {
         shakeOffset_ = {0,0,0};
         return;
     }
-    // ramp in briefly, then let the vibration decay during ignition.
     const double ramp = std::min(1.0,shakeTime_ / 0.08);
     const double strength = 0.26 * ramp * std::exp(-3.5 * shakeTime_);
     shakeOffset_ = math3d::vec3{std::sin(45.0 * shakeTime_),
@@ -97,7 +91,6 @@ math3d::vec3 Camera::position() const {
 
 math3d::mat4 Camera::view() const {
     const auto eye = position();
-    // Keep the tracked rocket centered when the camera position vibrates.
     const auto target = chasing_ ? chaseTarget_ : eye + direction();
     return math3d::look_at(eye, target, {0,1,0});
 }

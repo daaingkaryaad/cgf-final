@@ -106,7 +106,6 @@ void Scene::buildBoosters() {
     add(boosterParts_,cylinder,{0,5.54,0},{0.58,0.20,0.58},orange,0.35f);
     add(boosterParts_,taper,{0,0.30,0},{0.32,0.42,0.32},dark,0.8f);
     add(boosterParts_,box,{0.49,1.2,0},{0.65,1.25,0.10},steel,0.45f);
-    // Local -X faces the core. These lugs overlap the shell and remain with it after release.
     for (double height : {2.45,5.3})
         add(boosterParts_,box,{-0.50,height,0},{0.14,0.24,0.20},dark,0.45f);
 }
@@ -137,7 +136,6 @@ void Scene::drawBoosters(const Rocket& rocket) {
     static const Part nozzleGlow{cylinder,math3d::transform({0,0.08,0},{0.27,0.018,0.27}),
                                  {1,0.55,0.12},0,0,true};
     for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
-        // Rocket supplies a world pose in both states. Apply only the part's local transform.
         const auto model = rocket.boosterModel(i);
         for (const auto& part : boosterParts_) draw(part,model);
         if (showGlow) draw(nozzleGlow,model);
@@ -146,7 +144,6 @@ void Scene::drawBoosters(const Rocket& rocket) {
 
 void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
                    const vec3& eye, const Rocket& rocket, bool padLight) {
-    // fit the transition from 8 to 48 scene units into the short demo ascent.
     const float ascent = std::max(0.0f,std::min(1.0f,float((rocket.altitude()-8.0)/40.0)));
     const float skyDarkness = ascent*ascent*(3.0f-2.0f*ascent);
     const vec3 darkHorizon{0.095,0.145,0.235};
