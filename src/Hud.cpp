@@ -93,11 +93,6 @@ void Hud::render(int width,int height,const Rocket& rocket,double fps,
     const float virtualWidth=width/scale, virtualHeight=height/scale;
     pixels_.clear();
     const math3d::vec3 panel{0.035,0.075,0.075};
-    rect(24,24,365,103,panel,0.92f);
-    rect(24,24,3,103,amber);
-    text(43,40,"baikonur / launch control",1.8f,white);
-    text(43,65,"cgf / week 7 + 8 checkpoint",1.25f,muted);
-    text(43,96,"site 01 / kazakhstan",1.3f,amber);
     rect(virtualWidth-257,24,233,103,panel,0.92f);
     std::ostringstream count;
     if (fps>0) count<<std::fixed<<std::setprecision(0)<<fps<<" fps";
