@@ -31,11 +31,16 @@ Options options(int argc,char** argv) {
         if (flag=="--hidden") out.hidden=true;
         else if (flag=="--no-vsync") out.vsync=false;
         else if (flag=="--frames" && i+1<argc) {
-            out.frames=std::stoi(argv[++i]);
-            if (out.frames<1) throw std::runtime_error("--frames must be positive");
+            const std::string value=argv[++i];
+            std::size_t consumed=0;
+            out.frames=std::stoi(value,&consumed);
+            if (consumed!=value.size() || out.frames<1)
+                throw std::runtime_error("--frames must be a positive integer");
         } else if (flag=="--simulate" && i+1<argc) {
-            out.simulate=std::stod(argv[++i]);
-            if (!std::isfinite(out.simulate) || out.simulate<0)
+            const std::string value=argv[++i];
+            std::size_t consumed=0;
+            out.simulate=std::stod(value,&consumed);
+            if (consumed!=value.size() || !std::isfinite(out.simulate) || out.simulate<0)
                 throw std::runtime_error("--simulate must be finite and non-negative");
         } else if (flag=="--capture" && i+1<argc) out.capture=argv[++i];
         else if (flag=="--shaders" && i+1<argc) out.shaderDirectory=argv[++i];
