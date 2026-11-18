@@ -17,6 +17,7 @@ public:
     void update(double dt, const Outlets& outlets, bool firing, std::size_t activeOutlets=5);
     void render(const math3d::mat4& view, const math3d::mat4& projection);
     void reset();
+    bool hasParticles() const { return !particles_.empty(); }
 
 private:
     struct Particle {

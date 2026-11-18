@@ -17,6 +17,7 @@ public:
                 const math3d::vec3& eye, const Rocket& rocket, bool padLight);
     void updateExhaust(const Rocket& rocket, double dt);
     void resetExhaust() { exhaust_.reset(); }
+    bool exhaustActive() const { return exhaust_.hasParticles(); }
 private:
     enum Shape { box, plane, cylinder, cone, taper, shapeCount };
     struct Part {

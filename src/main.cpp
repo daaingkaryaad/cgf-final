@@ -139,6 +139,19 @@ void screenshot(const std::string& path,int width,int height) {
     std::cout<<"saved capture: "<<path<<"\n";
 }
 
+void advanceSimulation(State& app, double seconds) {
+    app.rocket.start();
+    double remaining = seconds;
+    while (remaining > 0.0) {
+        const double dt = std::min(remaining,1.0/60.0);
+        app.rocket.update(dt);
+        app.scene.updateExhaust(app.rocket,dt);
+        remaining -= dt;
+        if (app.rocket.stage()==Rocket::Stage::complete &&
+            !app.rocket.boostersVisible() && !app.scene.exhaustActive()) break;
+    }
+}
+
 void run(GLFWwindow* window,const Options& settings) {
     Scene scene(settings.shaderDirectory);
     State app(scene);
@@ -148,7 +161,7 @@ void run(GLFWwindow* window,const Options& settings) {
     glfwSetMouseButtonCallback(window,onClick);
     glfwSetWindowFocusCallback(window,onFocus);
     Hud hud(settings.shaderDirectory);
-    if (settings.simulate>=0) { app.rocket.start(); app.rocket.update(settings.simulate); }
+    if (settings.simulate>=0) advanceSimulation(app,settings.simulate);
     double last=glfwGetTime(), fpsStart=last, fps=0;
     int frameCount=0,totalFrames=0;
     std::cout<<"space launch | r reset scene | l pad light | h home camera | c camera mode\n"
