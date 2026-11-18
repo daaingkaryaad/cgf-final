@@ -2,3 +2,5 @@
 *.ppm
 *.dSYM/
 .DS_Store
+/baikonur
+/baikonur.exe
