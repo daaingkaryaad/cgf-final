@@ -15,7 +15,7 @@ SOURCES = src/main.cpp src/Camera.cpp src/Rocket.cpp src/Shader.cpp src/Mesh.cpp
 OBJECTS = $(SOURCES:src/%.cpp=build/%.o)
 TEST_SOURCES = tests/core_tests.cpp src/Camera.cpp src/Rocket.cpp src/Geometry.cpp
 
-.PHONY: all run clean check-gl test
+.PHONY: all run clean check-gl test check-render
 all: $(TARGET)
 
 check-gl:
@@ -38,6 +38,9 @@ build/core_tests: $(TEST_SOURCES) $(wildcard include/*.h)
 
 test: build/core_tests
 	./build/core_tests
+
+check-render: $(TARGET)
+	./$(TARGET) --hidden --frames 1
 
 clean:
 	rm -rf build $(TARGET)
