@@ -191,7 +191,14 @@ void run(GLFWwindow* window,const Options& settings) {
         last=now;
         int width=0,height=0;
         glfwGetFramebufferSize(window,&width,&height);
-        if (width==0 || height==0) { glfwWaitEventsTimeout(0.05); continue; }
+        if (width==0 || height==0 || glfwGetWindowAttrib(window,GLFW_ICONIFIED)) {
+            frameCount=0;
+            fps=0;
+            glfwWaitEventsTimeout(0.05);
+            last=glfwGetTime();
+            fpsStart=last;
+            continue;
+        }
         moveCamera(window,dt);
         updateSimulation(app,dt);
         glViewport(0,0,width,height);
