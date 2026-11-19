@@ -144,17 +144,27 @@ void screenshot(const std::string& path,int width,int height) {
     std::cout<<"saved capture: "<<path<<"\n";
 }
 
-void advanceSimulation(State& app, double seconds) {
-    app.rocket.start();
+void updateSimulation(State& app, double seconds) {
+    if (seconds<=0.0 || !std::isfinite(seconds)) return;
     double remaining = seconds;
     while (remaining > 0.0) {
         const double dt = std::min(remaining,1.0/60.0);
         app.rocket.update(dt);
         app.scene.updateExhaust(app.rocket,dt);
+        app.camera.follow(rocketCameraTarget(app.rocket),dt);
+        app.camera.updateIgnitionShake(app.rocket.stage()==Rocket::Stage::ignition,dt);
         remaining -= dt;
         if (app.rocket.stage()==Rocket::Stage::complete &&
-            !app.rocket.boostersVisible() && !app.scene.exhaustActive()) break;
+            !app.rocket.boostersVisible() && !app.scene.exhaustActive()) {
+            app.camera.follow(rocketCameraTarget(app.rocket),remaining);
+            break;
+        }
     }
+}
+
+void advanceSimulation(State& app, double seconds) {
+    app.rocket.start();
+    updateSimulation(app,seconds);
 }
 
 void run(GLFWwindow* window,const Options& settings) {
@@ -176,19 +186,17 @@ void run(GLFWwindow* window,const Options& settings) {
         glfwPollEvents();
         if (glfwWindowShouldClose(window)) break;
         const double now=glfwGetTime();
-        const double dt=std::min(0.05,std::max(0.0,now-last));
+        const double elapsed=std::max(0.0,now-last);
+        const double dt=elapsed<=1.0 ? elapsed : 0.0;
         last=now;
         int width=0,height=0;
         glfwGetFramebufferSize(window,&width,&height);
         if (width==0 || height==0) { glfwWaitEventsTimeout(0.05); continue; }
         moveCamera(window,dt);
-        app.rocket.update(dt);
-        app.camera.follow(rocketCameraTarget(app.rocket),dt);
-        app.camera.updateIgnitionShake(app.rocket.stage()==Rocket::Stage::ignition,dt);
+        updateSimulation(app,dt);
         glViewport(0,0,width,height);
         glClearColor(0.65f,0.73f,0.72f,1);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-        scene.updateExhaust(app.rocket,dt);
         const auto projection=math3d::perspective(50.0*math3d::pi/180.0,double(width)/height,0.1,600.0);
         scene.render(app.camera.view(),projection,app.camera.position(),app.rocket,app.padLight);
         hud.render(width,height,app.rocket,fps,app.padLight,app.captured,app.camera.chasing());
