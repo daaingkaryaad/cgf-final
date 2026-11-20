@@ -34,12 +34,13 @@ private:
     GLuint skyVao_ = 0, shadowFbo_ = 0, shadowTexture_ = 0;
     int shadowSize_ = 2048;
     bool depthPass_ = false;
-    std::vector<Part> site_, rocket_, boosterParts_;
+    std::vector<Part> site_, rocket_, boosterParts_, workers_;
     void buildSite();
     void initShadowMap();
     math3d::mat4 renderShadowMap(const Rocket& rocket, bool padLight);
     void drawOpaque(const Rocket& rocket, bool padLight);
     void buildEquipment();
+    void buildWorkers();
     void addBeam(std::vector<Part>& list, Shape shape, const math3d::vec3& a,
                  const math3d::vec3& b, double radius, const math3d::vec3& colour,
                  float specular=0.15f);

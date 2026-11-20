@@ -22,6 +22,7 @@ Scene::Scene(const std::string& directory)
     initShadowMap();
     buildSite();
     buildEquipment();
+    buildWorkers();
     buildRocket();
     buildBoosters();
 }
@@ -252,6 +253,8 @@ void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
 void Scene::drawOpaque(const Rocket& rocket, bool padLight) {
     const auto identity=math3d::identity();
     for (const auto& part : site_) draw(part,identity);
+    if (rocket.stage()==Rocket::Stage::ready || rocket.stage()==Rocket::Stage::countdown)
+        for (const auto& part : workers_) draw(part,identity);
     const auto coreModel = rocket.model();
     for (const auto& part : rocket_) draw(part,coreModel);
     drawBoosters(rocket);

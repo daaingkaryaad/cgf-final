@@ -20,6 +20,34 @@ void Scene::appendParts(std::vector<Part>& target, const std::vector<Part>& part
     }
 }
 
+void Scene::buildWorkers() {
+    const vec3 positions[]={{9.1,-0.025,-5.3},{9.6,-0.025,-6.7},
+                            {10.7,-0.025,-4.4},{21,-0.025,-2.2}};
+    const double angles[]={-0.9,0.5,-1.2,2.5};
+    for (int i=0;i<4;++i) {
+        std::vector<Part> worker;
+        const vec3 jacket=i==1 ? yellow : orange;
+        for (int side:{-1,1}) {
+            add(worker,box,{side*0.11,0.065,0.045},{0.18,0.13,0.29},rubber,0.05f);
+            add(worker,cylinder,{side*0.11,0.43,0},{0.085,0.60,0.085},dark,0.05f);
+            const vec3 shoulder{side*0.27,1.17,0};
+            const vec3 hand=(i==0 && side==1) ? vec3{0.42,1.57,0.04} :
+                            (i==1 ? vec3{side*0.16,0.99,0.28} : vec3{side*0.33,0.81,0.07});
+            addBeam(worker,cylinder,shoulder,hand,0.075,jacket,0.05f);
+            add(worker,box,hand,{0.11,0.12,0.10},{0.62,0.44,0.30},0.05f);
+        }
+        add(worker,box,{0,0.73,0},{0.37,0.18,0.25},dark,0.05f);
+        add(worker,box,{0,1.02,0},{0.44,0.56,0.28},jacket,0.08f);
+        for (int side:{-1,1})
+            add(worker,box,{0,1.10,side*0.145},{0.45,0.055,0.015},cream,0.15f);
+        add(worker,cylinder,{0,1.43,0},{0.14,0.25,0.14},{0.62,0.44,0.30},0.06f);
+        add(worker,cylinder,{0,1.54,0},{0.22,0.045,0.20},cream,0.3f);
+        add(worker,taper,{0,1.62,0},{0.18,0.15,0.17},cream,0.3f);
+        if (i==1) add(worker,box,{0,1.0,0.31},{0.31,0.35,0.035},steel,0.1f);
+        appendParts(workers_,worker,math3d::transform(positions[i],{1,1,1},angles[i]));
+    }
+}
+
 void Scene::buildEquipment() {
     const vec3 wood{0.48,0.32,0.15}, band{0.23,0.26,0.23};
     for (const vec3 center:{vec3{11.6,0.325,-1.8},vec3{11.6,0.325,-2.6},vec3{11.6,1.025,-1.8}}) {
