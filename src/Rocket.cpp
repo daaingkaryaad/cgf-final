@@ -122,7 +122,11 @@ bool Rocket::boostersSeparated() const {
 }
 
 bool Rocket::boostersVisible() const {
-    return launchElapsed_ < boostersImpactAt;
+    return true;
+}
+
+bool Rocket::boostersLanded() const {
+    return launchElapsed_ >= boostersImpactAt;
 }
 
 math3d::mat4 Rocket::boosterModel(std::size_t index) const {

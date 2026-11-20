@@ -18,6 +18,7 @@ public:
     math3d::mat4 model() const;
     bool boostersSeparated() const;
     bool boostersVisible() const;
+    bool boostersLanded() const;
     math3d::mat4 boosterModel(std::size_t index) const;
 private:
     Stage stage_ = Stage::ready;

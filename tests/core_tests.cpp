@@ -106,7 +106,7 @@ void boosterTests() {
     expect(transform_point(rocket.boosterModel(0),pivot).y<atCoreStop.y && close(rocket.altitude(),90),
            "booster motion continues while the core is stationary");
     rocket.update(0.5);
-    expect(!rocket.boostersVisible(),"boosters disappear at ground impact");
+    expect(rocket.boostersLanded() && rocket.boostersVisible(),"boosters remain visible at ground impact");
     rocket.reset();
     expect(!rocket.boostersSeparated() && rocket.boostersVisible(),"reset restores attached booster visibility");
     for (std::size_t i=0; i<Rocket::boosterCount; ++i)
@@ -150,7 +150,7 @@ void boosterTimingTests() {
                       transform_point(boundary.boosterModel(i),{0,6.65,0}))<1e-5,
                "a long update consumes only the time after release for booster motion");
     oneStep.update(std::numeric_limits<double>::max());
-    expect(oneStep.boostersSeparated() && !oneStep.boostersVisible() && close(oneStep.altitude(),90),
+    expect(oneStep.boostersSeparated() && oneStep.boostersLanded() && oneStep.boostersVisible() && close(oneStep.altitude(),90),
            "a huge finite update finishes booster flight without changing core altitude");
 }
 
@@ -213,16 +213,16 @@ void boosterImpactTests() {
     expect(fine.boostersSeparated() && fine.boostersVisible() && fine.stage()==Rocket::Stage::complete,
            "boosters remain visible on final approach after the core stops");
     double age = 3.65;
-    while (fine.boostersVisible() && age<3.8) {
+    while (!fine.boostersLanded() && age<3.8) {
         age += 0.001;
         fine.update(0.001);
     }
-    expect(!fine.boostersVisible(),"boosters disappear at terrain contact before the old cutoff");
+    expect(fine.boostersLanded() && fine.boostersVisible(),"boosters remain visible at terrain contact");
 
     Rocket coarse;
     coarse.start();
     coarse.update(release+age+1.0);
-    expect(coarse.boostersSeparated() && !coarse.boostersVisible() &&
+    expect(coarse.boostersSeparated() && coarse.boostersLanded() && coarse.boostersVisible() &&
            coarse.stage()==Rocket::Stage::complete && close(coarse.altitude(),90) && close(coarse.velocity(),0),
            "an update spanning impact leaves the finished core intact");
     const auto groundRim = [](const mat4& pose) {
@@ -236,14 +236,14 @@ void boosterImpactTests() {
     }
     fine.start();
     fine.update(1.0);
-    expect(!fine.boostersVisible(),"impacted boosters stay hidden until reset");
+    expect(fine.boostersLanded() && fine.boostersVisible(),"landed boosters remain visible until reset");
     fine.reset();
-    expect(fine.boostersVisible() && !fine.boostersSeparated(),"reset clears the impacted state");
+    expect(fine.boostersVisible() && !fine.boostersSeparated() && !fine.boostersLanded(),"reset clears the landed state");
     fine.start();
     fine.update(release+3.65);
     expect(fine.boostersVisible(),"relaunch restores the full descent before the next impact");
     fine.update(0.15);
-    expect(!fine.boostersVisible(),"relaunch reaches ground impact again");
+    expect(fine.boostersLanded() && fine.boostersVisible(),"relaunch reaches ground impact again");
 }
 
 void transformTests() {

@@ -155,7 +155,7 @@ void updateSimulation(State& app, double seconds) {
         app.camera.updateIgnitionShake(app.rocket.stage()==Rocket::Stage::ignition,dt);
         remaining -= dt;
         if (app.rocket.stage()==Rocket::Stage::complete &&
-            !app.rocket.boostersVisible() && !app.scene.exhaustActive()) {
+            app.rocket.boostersLanded() && !app.scene.exhaustActive()) {
             app.camera.follow(rocketCameraTarget(app.rocket),remaining);
             break;
         }
