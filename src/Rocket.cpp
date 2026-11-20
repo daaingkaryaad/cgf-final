@@ -18,6 +18,7 @@ constexpr double driftSpeed = 4.5;
 constexpr double driftYaw = math3d::pi/8.0;
 constexpr double tumbleSpeed = 1.25;
 constexpr double spinSpeed = 0.32;
+constexpr double settlingDuration = 0.8;
 const double separationTime = std::sqrt(2.0*separationHeight/ascentAcceleration);
 const double separationAt = ignitionEnd+separationTime;
 const double coreStopsAt = ignitionEnd+std::sqrt(2.0*maximumAltitude/ascentAcceleration);
@@ -44,9 +45,8 @@ math3d::mat4 boosterTumble(double easedAge) {
     return math3d::multiply(rotationZ(-tumbleSpeed*easedAge),math3d::rotation_y(spinSpeed*easedAge));
 }
 
-double boosterGroundClearance(double age) {
-    const auto tumble = boosterTumble(easedFlightAge(age));
-    const double x = tumble[1], y = tumble[5], z = tumble[9];
+double boosterLowestPoint(const math3d::mat4& rotation) {
+    const double x = rotation[1], y = rotation[5], z = rotation[9];
     const double radial = std::hypot(x,z);
     const auto cylinderBottom = [=](double base, double top, double radius) {
         return std::min((base-boosterPivot)*y,(top-boosterPivot)*y)-radius*radial;
@@ -57,7 +57,11 @@ double boosterGroundClearance(double age) {
                                    cylinderBottom(0.45,1.15,0.68),
                                    cylinderBottom(1.15,5.65,0.58),
                                    (6.65-boosterPivot)*y,finBottom});
-    return boosterCenterHeight(age)+lowest-terrainHeight;
+    return lowest;
+}
+
+double boosterGroundClearance(double age) {
+    return boosterCenterHeight(age)+boosterLowestPoint(boosterTumble(easedFlightAge(age)))-terrainHeight;
 }
 
 double impactAge() {
@@ -74,7 +78,8 @@ double impactAge() {
 
 const double boosterImpactAge = impactAge();
 const double boostersImpactAt = separationAt+boosterImpactAge;
-const double launchEndsAt = std::max(coreStopsAt,boostersImpactAt);
+const double boostersLandAt = boostersImpactAt+settlingDuration;
+const double launchEndsAt = std::max(coreStopsAt,boostersLandAt);
 }
 
 void Rocket::start() {
@@ -127,7 +132,7 @@ bool Rocket::boostersVisible() const {
 }
 
 bool Rocket::boostersLanded() const {
-    return launchElapsed_ >= boostersImpactAt;
+    return launchElapsed_ >= boostersLandAt;
 }
 
 math3d::mat4 Rocket::boosterModel(std::size_t index) const {
@@ -142,8 +147,20 @@ math3d::mat4 Rocket::boosterModel(std::size_t index) const {
     const double age = std::min(launchElapsed_-separationAt,boosterImpactAge);
     const double easedAge = easedFlightAge(age);
     const vec3 drift{std::cos(angle+driftYaw),0,std::sin(angle+driftYaw)};
-    const vec3 center = outward*boosterOffset+drift*(driftSpeed*easedAge)+vec3{0,boosterCenterHeight(age),0};
-    const auto tumble = boosterTumble(easedAge);
+    vec3 center = outward*boosterOffset+drift*(driftSpeed*easedAge)+vec3{0,boosterCenterHeight(age),0};
+    auto tumble = boosterTumble(easedAge);
+    if (launchElapsed_>=boostersImpactAt) {
+        const double u = std::min(1.0,(launchElapsed_-boostersImpactAt)/settlingDuration);
+        const double blend = u*u*(3.0-2.0*u);
+        const double impactTilt = -tumbleSpeed*easedAge;
+        const double rock = 0.06*std::sin(3.0*pi*u)*(1.0-u)*(1.0-u);
+        const double tilt = impactTilt+(-1.5*pi-impactTilt)*blend+rock;
+        const double roll = spinSpeed*easedAge+0.12*blend;
+        tumble = multiply(rotationZ(tilt),rotation_y(roll));
+        const double slide = (driftSpeed*settlingDuration/3.0)*u*(3.0+u*(u-3.0));
+        center = outward*boosterOffset+drift*(driftSpeed*easedAge+slide);
+        center.y = terrainHeight-boosterLowestPoint(tumble);
+    }
     return multiply(translation(center),
                     multiply(facing,multiply(tumble,translation({0,-boosterPivot,0}))));
 }
