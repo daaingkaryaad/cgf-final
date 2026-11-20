@@ -11,6 +11,7 @@ constexpr vec3 coreOutlet{0,0.263,0}, boosterOutlet{0,0.08,0};
 Scene::Scene(const std::string& directory)
     : shader_(directory+"/basic.vert",directory+"/basic.frag"),
       sky_(directory+"/sky.vert",directory+"/sky.frag"),
+      shadowShader_(directory+"/shadow.vert",directory+"/shadow.frag"),
       exhaust_(directory) {
     meshes_[box].reset(new Mesh(geometry::box()));
     meshes_[plane].reset(new Mesh(geometry::plane()));
@@ -18,13 +19,77 @@ Scene::Scene(const std::string& directory)
     meshes_[cone].reset(new Mesh(geometry::frustum(0.0f)));
     meshes_[taper].reset(new Mesh(geometry::frustum(0.58f)));
     glGenVertexArrays(1,&skyVao_);
+    initShadowMap();
     buildSite();
     buildEquipment();
     buildRocket();
     buildBoosters();
 }
 
-Scene::~Scene() { glDeleteVertexArrays(1,&skyVao_); }
+Scene::~Scene() {
+    glDeleteFramebuffers(1,&shadowFbo_);
+    glDeleteTextures(1,&shadowTexture_);
+    glDeleteVertexArrays(1,&skyVao_);
+}
+
+void Scene::initShadowMap() {
+    GLint maximum=0,previousFbo=0;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE,&maximum);
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING,&previousFbo);
+    shadowSize_=std::min(shadowSize_,maximum);
+    glGenTextures(1,&shadowTexture_);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D,shadowTexture_);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT24,shadowSize_,shadowSize_,0,
+                 GL_DEPTH_COMPONENT,GL_FLOAT,nullptr);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_BORDER);
+    const GLfloat border[]={1,1,1,1};
+    glTexParameterfv(GL_TEXTURE_2D,GL_TEXTURE_BORDER_COLOR,border);
+    glGenFramebuffers(1,&shadowFbo_);
+    glBindFramebuffer(GL_FRAMEBUFFER,shadowFbo_);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,shadowTexture_,0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    const GLenum status=glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    glBindFramebuffer(GL_FRAMEBUFFER,GLuint(previousFbo));
+    glBindTexture(GL_TEXTURE_2D,0);
+    glActiveTexture(GL_TEXTURE0);
+    if (status!=GL_FRAMEBUFFER_COMPLETE) {
+        glDeleteFramebuffers(1,&shadowFbo_);shadowFbo_=0;
+        glDeleteTextures(1,&shadowTexture_);shadowTexture_=0;
+        throw std::runtime_error("cannot create the sun shadow framebuffer");
+    }
+}
+
+math3d::mat4 Scene::renderShadowMap(const Rocket& rocket, bool padLight) {
+    const vec3 target{0,5,0};
+    const vec3 sun=math3d::normalized({-0.5,0.8,0.35});
+    const auto lightView=math3d::look_at(target+sun*75.0,target,{0,1,0});
+    const auto lightProjection=math3d::orthographic(-38,38,-38,38,1,150);
+    const auto lightSpace=math3d::multiply(lightProjection,lightView);
+    GLint previousFbo=0,viewport[4];
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING,&previousFbo);
+    glGetIntegerv(GL_VIEWPORT,viewport);
+    glBindFramebuffer(GL_FRAMEBUFFER,shadowFbo_);
+    glViewport(0,0,shadowSize_,shadowSize_);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(2.0f,4.0f);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    shadowShader_.use();
+    shadowShader_.matrix("lightSpace",lightSpace);
+    depthPass_=true;
+    drawOpaque(rocket,padLight);
+    depthPass_=false;
+    glDisable(GL_POLYGON_OFFSET_FILL);
+    glBindFramebuffer(GL_FRAMEBUFFER,GLuint(previousFbo));
+    glViewport(viewport[0],viewport[1],viewport[2],viewport[3]);
+    return lightSpace;
+}
 
 void Scene::add(std::vector<Part>& list, Shape shape, const vec3& pos,
                 const vec3& scale, const vec3& colour, float specular,
@@ -112,7 +177,13 @@ void Scene::buildBoosters() {
 }
 
 void Scene::draw(const Part& part, const math3d::mat4& parent) {
-    shader_.matrix("model",math3d::multiply(parent,part.local));
+    const auto model=math3d::multiply(parent,part.local);
+    if (depthPass_) {
+        shadowShader_.matrix("model",model);
+        meshes_[part.shape]->draw();
+        return;
+    }
+    shader_.matrix("model",model);
     shader_.vector("baseColour",part.colour);
     shader_.scalar("specularStrength",part.specular);
     shader_.scalar("textureRepeat",part.textureRepeat);
@@ -145,6 +216,7 @@ void Scene::drawBoosters(const Rocket& rocket) {
 
 void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
                    const vec3& eye, const Rocket& rocket, bool padLight) {
+    const auto lightSpace=renderShadowMap(rocket,padLight);
     const float ascent = std::max(0.0f,std::min(1.0f,float((rocket.altitude()-8.0)/40.0)));
     const float skyDarkness = ascent*ascent*(3.0f-2.0f*ascent);
     const vec3 darkHorizon{0.095,0.145,0.235};
@@ -168,6 +240,16 @@ void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
     shader_.integer("padLightOn",padLight ? 1 : 0);
     shader_.integer("surfaceTexture",0);
     concrete_.bind();
+    shader_.matrix("sunViewProjection",lightSpace);
+    shader_.integer("sunDepth",1);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D,shadowTexture_);
+    glActiveTexture(GL_TEXTURE0);
+    drawOpaque(rocket,padLight);
+    exhaust_.render(view,projection);
+}
+
+void Scene::drawOpaque(const Rocket& rocket, bool padLight) {
     const auto identity=math3d::identity();
     for (const auto& part : site_) draw(part,identity);
     const auto coreModel = rocket.model();
@@ -181,5 +263,4 @@ void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
                         {1,0.55,0.12},0,0,true};
         draw(coreNozzle,coreModel);
     }
-    exhaust_.render(view,projection);
 }
