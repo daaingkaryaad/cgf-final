@@ -15,6 +15,7 @@ constexpr double terrainHeight = -0.025;
 constexpr double boosterGravity = 14.0;
 constexpr double releaseRamp = 0.12;
 constexpr double driftSpeed = 4.5;
+constexpr double driftYaw = math3d::pi/8.0;
 constexpr double tumbleSpeed = 1.25;
 constexpr double spinSpeed = 0.32;
 const double separationTime = std::sqrt(2.0*separationHeight/ascentAcceleration);
@@ -140,7 +141,8 @@ math3d::mat4 Rocket::boosterModel(std::size_t index) const {
 
     const double age = std::min(launchElapsed_-separationAt,boosterImpactAge);
     const double easedAge = easedFlightAge(age);
-    const vec3 center = outward*(boosterOffset+driftSpeed*easedAge)+vec3{0,boosterCenterHeight(age),0};
+    const vec3 drift{std::cos(angle+driftYaw),0,std::sin(angle+driftYaw)};
+    const vec3 center = outward*boosterOffset+drift*(driftSpeed*easedAge)+vec3{0,boosterCenterHeight(age),0};
     const auto tumble = boosterTumble(easedAge);
     return multiply(translation(center),
                     multiply(facing,multiply(tumble,translation({0,-boosterPivot,0}))));

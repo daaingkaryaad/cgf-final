@@ -16,6 +16,8 @@ void expect(bool condition,const char* message) {
 }
 bool close(double a,double b,double tolerance=1e-5) { return std::abs(a-b)<tolerance; }
 
+#include "booster_landing_tests.h"
+
 void launchTests() {
     Rocket rocket;
     expect(rocket.stage()==Rocket::Stage::ready,"initial state");
@@ -92,7 +94,9 @@ void boosterTests() {
     const auto drifting = transform_point(rocket.boosterModel(0),pivot);
     for (std::size_t i=0; i<Rocket::boosterCount; ++i) {
         const auto center = transform_point(rocket.boosterModel(i),pivot);
-        expect(dot(center-before[i],directions[i])>3,"each booster drifts away from the core");
+        const double angle=i*(0.5*pi)+pi/8.0;
+        const vec3 drift{std::cos(angle),0,std::sin(angle)};
+        expect(dot(center-before[i],drift)>3,"each booster follows its clear outward corridor");
     }
     expect(std::abs(transform_point(rocket.boosterModel(0),{0,5.8,0}).x-drifting.x)>1,
            "detached booster tumbles around its center");
@@ -437,7 +441,7 @@ void meshTest(const MeshData& mesh) {
 int main() {
     try {
         launchTests(); boosterTests(); boosterTimingTests(); boosterMotionTests(); boosterImpactTests();
-        transformTests(); cameraTests(); projectionTests();
+        landingFootprintTests(); transformTests(); cameraTests(); projectionTests();
         meshTest(geometry::box()); meshTest(geometry::plane());
         meshTest(geometry::frustum(1)); meshTest(geometry::frustum(0)); meshTest(geometry::frustum(0.58f));
         std::cout<<checks<<" checks passed: launch, hierarchy, camera, geometry\n";

@@ -32,7 +32,7 @@ build/%.o: src/%.cpp | check-gl
 run: $(TARGET)
 	./$(TARGET)
 
-build/core_tests: $(TEST_SOURCES) $(wildcard include/*.h)
+build/core_tests: $(TEST_SOURCES) $(wildcard include/*.h) $(wildcard tests/*.h)
 	@mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Iinclude $(TEST_SOURCES) -o $@
 
