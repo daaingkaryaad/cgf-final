@@ -19,6 +19,7 @@ Scene::Scene(const std::string& directory)
     meshes_[taper].reset(new Mesh(geometry::frustum(0.58f)));
     glGenVertexArrays(1,&skyVao_);
     buildSite();
+    buildEquipment();
     buildRocket();
     buildBoosters();
 }

@@ -34,6 +34,12 @@ private:
     GLuint skyVao_ = 0;
     std::vector<Part> site_, rocket_, boosterParts_;
     void buildSite();
+    void buildEquipment();
+    void addBeam(std::vector<Part>& list, Shape shape, const math3d::vec3& a,
+                 const math3d::vec3& b, double radius, const math3d::vec3& colour,
+                 float specular=0.15f);
+    void appendParts(std::vector<Part>& target, const std::vector<Part>& parts,
+                     const math3d::mat4& parent);
     void buildRocket();
     void buildBoosters();
     void add(std::vector<Part>& list, Shape shape, const math3d::vec3& pos,
