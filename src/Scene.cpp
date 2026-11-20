@@ -239,6 +239,9 @@ void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
     shader_.vector("sunDirection",math3d::normalized({-0.5,0.8,0.35}));
     shader_.vector("padLightPosition",{8,7.0,4.7});
     shader_.integer("padLightOn",padLight ? 1 : 0);
+    shader_.vector("engineLightPosition",math3d::transform_point(rocket.model(),coreOutlet));
+    const float engineLight=rocket.enginesOn() ? float(std::max(0.0,1.0-rocket.altitude()/18.0)) : 0.0f;
+    shader_.scalar("engineLightStrength",engineLight);
     shader_.integer("surfaceTexture",0);
     concrete_.bind();
     shader_.matrix("sunViewProjection",lightSpace);

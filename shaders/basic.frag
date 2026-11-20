@@ -10,6 +10,8 @@ uniform vec3 eyePosition;
 uniform vec3 sunDirection;
 uniform vec3 padLightPosition;
 uniform int padLightOn;
+uniform vec3 engineLightPosition;
+uniform float engineLightStrength;
 uniform int emissive;
 uniform float specularStrength;
 uniform float textureRepeat;
@@ -53,6 +55,13 @@ void main() {
         float distanceToLight = length(delta);
         float attenuation = 1.0/(1.0+0.035*distanceToLight+0.009*distanceToLight*distanceToLight);
         colour += attenuation*phong(n,v,normalize(delta),albedo,vec3(1.35,1.11,0.66));
+    }
+    if (engineLightStrength > 0.0) {
+        vec3 delta = engineLightPosition-worldPosition;
+        float distanceToLight = length(delta);
+        float attenuation = engineLightStrength/(1.0+0.12*distanceToLight+0.08*distanceToLight*distanceToLight);
+        vec3 direction = delta/max(distanceToLight,0.0001);
+        colour += attenuation*phong(n,v,direction,albedo,vec3(2.4,0.85,0.16));
     }
     if (emissive != 0) colour = baseColour;
     float distanceToEye = length(eyePosition-worldPosition);
