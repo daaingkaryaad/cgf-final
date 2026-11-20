@@ -9,21 +9,43 @@ An interactive 3D rocket-launch simulation built with C++ and modern OpenGL.
 
 | Team member | Contributions |
 | --- | --- |
-| Ingkar Adilbek | Initial scene and rendering integration, launch-site geometry, procedural texturing, repository coordination and combined verification |
-| Dinara Dyussembayeva | Free and chase cameras, ignition camera shake, camera input handling and numerical stability of vector, matrix and projection operations |
-| Fariza Arstanbek | Altitude-based sky transition, procedural stars and antialiasing, title-panel cleanup, booster landing paths and settling animation |
-| Ulzhan Nabiyeva | Instanced fire and smoke, exhaust integration and cutoff, simulated-startup preparation, launch timing, argument validation and persistent landed boosters |
-| Syndaly Yerzhan | Project structure, booster separation and falling motion, impact detection, separation tests, build cleanup, rendering smoke-check target and fps recovery after minimization |
+| Ingkar Adilbek | Initial scene and rendering integration, launch-site geometry, procedural texturing, manual application testing, fps checks, documentation, repository coordination and combined verification |
+| Dinara Dyussembayeva | Free and chase cameras, ignition camera shake, camera input handling and numerical stability of vector, matrix and projection operations, demo video and release |
+| Fariza Arstanbek | Altitude-based sky transition, procedural stars and antialiasing, title-panel cleanup, booster landing paths and settling animation, 	launch-site equipment and directional sun shadows |
+| Ulzhan Nabiyeva | Instanced fire and smoke, exhaust integration and cutoff, simulated-startup preparation, launch timing, argument validation and persistent landed boosters, 	pre-launch workers and engine ignition lighting |
+| Syndaly Yerzhan | Project structure, booster separation and falling motion, impact detection, separation tests, build cleanup, rendering smoke-check target and fps recovery after minimization, 	service vehicle and retracting service arm |
 
 ## Features
 
-1. Launch and Simulation
-
-2. Scene and Rendering
-
-3. Camera and Interface
-
-4. Requirements
+#### 1. Launch and Simulation
+- a key-triggered sequence with a three-second countdown, ignition, ascent and completion states.
+- a rocket assembled from a central body and four attached boosters using parent-child transforms.
+- 4 boosters detach at 54 scene units, drift outward through clear landing corridors, tumble, touch down and settle horizontally around the launch site.
+- landed boosters remain visible and stationary until the scene is reset.
+- instanced fire and smoke from all five engines before separation; only the central engine continues emitting afterward.
+- time-based movement with small simulation steps to preserve launch timing during slow rendering frames.
+- reset restores the rocket, boosters, camera, lighting and scene actors for another launch.
+#### 2. Scene and Rendering
+- a launch pad, service tower, utility building, storage tanks, road and steppe landscape built from procedural geometry.
+- a parked service vehicle, crates, cable reels and a small equipment cart around the utility area.
+- low-poly workers visible before ignition and cleared from the scene when ignition begins.
+- a service arm that retracts during countdown before the rocket lifts off.
+- model, view and projection matrices, depth testing and custom glsl vertex and fragment shaders.
+- per-fragment phong lighting with ambient, diffuse and specular terms.
+- directional sunlight, a toggleable launch-pad light and an orange engine light that illuminates nearby surfaces during ignition and fades with ascent.
+- ground shadows beneath the scene objects and landed boosters.
+- a generated concrete texture with uv coordinates, repeat wrapping and mipmapping.
+- a sky that darkens with altitude and procedural stars that become visible as the sky darkens.
+- additive fire blending and depth-sorted, alpha-blended smoke.
+#### 3. Camera and Interface
+- a keyboard-and-mouse free camera and a smooth rocket-following chase camera.
+- camera shake during ignition in both camera modes.
+- an on-screen mission-status panel with countdown, altitude and velocity.
+- visible fps, camera mode, light status and keyboard-control help.
+- a default framebuffer target of 1280 x 720; the fps counter shows the actual rate during execution.
+#### 4. Requirements
+- С++11- compatible compiler. `makefile` uses `clang++` by default, support for an opengl 3.3 core-profile context.
+- `make`, `pkg-config`, GLFW 3 and GLEW
 
 ## Build and Run
 Run build and application commands strictly from the repository root.
@@ -38,8 +60,9 @@ Finish the installation dialog before continuing. With <b>homebrew</b> installed
 ``` brew install glfw glew pkgconf ```
 
 <b>Clone, build and launch:</b>
-
-``` 
+```
+git clone https://github.com/daaingkaryaad/cgf-final.git
+cd cgf-final 
 make check-gl 
 make 
 make run 
@@ -65,7 +88,7 @@ make run
 
 Free-camera movement and mouse look are disabled while chase mode is active. Losing window focus releases mouse capture.
 
-To follow a launch, press ``` c ```, then space. After ascent, press ``` h ``` to inspect the launch site. Press ``` r ``` to reset; press ``` c ``` again if chase mode is wanted for the next launch.
+To follow a launch, press `c`, then space. After ascent, press `h` to inspect the launch site. Press `r` to reset; press `c` again if chase mode is wanted for the next launch.
 
 ## Checks and runtime options
 
@@ -79,7 +102,7 @@ Check application startup and shader compilation in a hidden window:
 make check-render
 ```
 
-| option | effect |
+| Option | Effect |
 | --- | --- |
 | `--hidden` | Create a hidden window |
 | `--no-vsync` | Disable vertical synchronization |
@@ -113,9 +136,9 @@ make clean
 
 #### Project generated assets
 
-| asset | creator and source | license / attribution status |
+| Asset | Creator and source | License / Attribution status |
 | --- | --- | --- |
-| Rocket, boosters, launch-site structures, terrain and scene props | Project team. Procedural geometry in `src/Geometry.cpp` and scene assembly in `src/Scene.cpp` | Generated for this project, so no external model asset license applies |
+| Rocket, boosters, launch-site structures, terrain and scene props | Project team. Procedural geometry in `src/Geometry.cpp`, scene assembly in `src/Scene.cpp` and `src/SiteDetails.cpp` | Generated for this project, so no external model asset license applies |
 | Concrete surface texture | Project team. Pixels generated in `src/Texture.cpp` | Generated for this project, so no downloaded texture image |
 | Fire, smoke and stars | Project team. Particle implementation and the programs in `shaders/` | Project-specific effects, so no imported particle sprites or skybox images |
 | Interface lettering | Project team. Bitmap glyph data defined in `src/Hud.cpp` | Project-specific glyph data, so no external font file |
@@ -127,17 +150,19 @@ Parts of the vector/matrix utilities, the original phong-reflection approach, an
 
 | Dependency | Authors/Project | Goal | License and source |
 | --- | --- | --- | --- |
-| GLFW | Marcus Geelnard, Camilla Lowy and GLFW contributors | Window creation, input and graphics-context setup | [zlib/libpng license](https://www.glfw.org/license.html); [project source](https://github.com/glfw/glfw) |
-| GLEW | Milan Ikits, Marcelo E. Magallon, Lev Povalahev and GLEW contributors | Loading opengl entry points | Modified BSD terms, with Mesa and Khronos permission notices in the [upstream license file](https://github.com/nigels-com/glew/blob/master/LICENSE.txt); [project source](https://github.com/nigels-com/glew) |
+| GLFW | Marcus Geelnard, Camilla Lowy and GLFW contributors | Window creation, input and graphics-context setup | [zlib/libpng license](https://www.glfw.org/license.html) and [glfw project source](https://github.com/glfw/glfw) |
+| GLEW | Milan Ikits, Marcelo E. Magallon, Lev Povalahev and GLEW contributors | Loading opengl entry points | [glew upstream license](https://github.com/nigels-com/glew/blob/master/LICENSE.txt) and [glew project source](https://github.com/nigels-com/glew) |
 
 These libraries are installed as system dependencies. Their authors retain their respective copyright and license terms.
 
 ## Technical references
-- GLFW window and framebuffer guide, glfw contributors; window/context reference, with the library license linked above.
-- FLEW initialization guide, glew contributors; library licensing is linked above.
-- Apple command-line tools installation, Apple; installation reference.
-- Homebrew GLFW, glew and pkgconf package pages, homebrew contributors; dependency installation references.
+- [glfw window and framebuffer guide](https://www.glfw.org/docs/latest/window_guide.html) for GLFW contributors.
+- [glew initialization guide](https://glew.sourceforge.net/basic.html) for GLEW contributors.
+- [apple command-line tools installation](https://developer.apple.com/documentation/xcode/installing-the-command-line-tools) for Apple.
+- [homebrew glfw package](https://formulae.brew.sh/formula/glfw) for Homebrew contributors.
+- [homebrew glew package](https://formulae.brew.sh/formula/glew) for Homebrew contributors.
+- [homebrew pkgconf package](https://formulae.brew.sh/formula/pkgconf) for Homebrew contributors.
 
 ## AI use
 
-Claude AI was used to assist with organizing and structuring the report PDF, finding special symbols and characters not easily accessible on the MAC keyboard (→, ≥, ≤ etc), and planning the structure of the demonstration video.
+Claude AI was used to assist with organizing and structuring the report PDF, finding special symbols and characters not easily accessible on the MAC keyboard (→, ≥, ≤ etc), and planning the structure of the demonstration video. ChatGPT was used to organize the references, find the sufficient websites and define their usage in our project.
