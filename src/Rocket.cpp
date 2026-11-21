@@ -119,6 +119,11 @@ bool Rocket::enginesOn() const {
     return stage_ == Stage::ignition || stage_ == Stage::ascent;
 }
 
+double Rocket::serviceArmRetraction() const {
+    const double t=std::max(0.0,std::min(1.0,launchElapsed_/2.4));
+    return t*t*(3.0-2.0*t);
+}
+
 math3d::mat4 Rocket::model() const {
     return math3d::translation({0,padHeight+altitude_,0});
 }

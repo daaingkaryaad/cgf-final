@@ -15,6 +15,7 @@ public:
     double altitude() const { return altitude_; }
     double velocity() const { return velocity_; }
     bool enginesOn() const;
+    double serviceArmRetraction() const;
     math3d::mat4 model() const;
     bool boostersSeparated() const;
     bool boostersVisible() const;

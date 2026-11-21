@@ -23,6 +23,7 @@ Scene::Scene(const std::string& directory)
     buildSite();
     buildVehicle();
     buildEquipment();
+    buildServiceArm();
     buildWorkers();
     buildRocket();
     buildBoosters();
@@ -128,7 +129,6 @@ void Scene::buildSite() {
                 {tx+side*1.2,y+2.7,tz+1.2},0.13),steel,0.3f,0,false});
         }
     }
-    add(site_,box,{-3.7,10.4,-2.3},{3.4,0.22,0.9},yellow,0.3f);
     add(site_,box,{tx,14.4,tz},{3.2,0.22,3.2},steel,0.4f);
     add(site_,cylinder,{tx,15.3,tz},{0.045,1.7,0.045},cream,0.2f);
     add(site_,cone,{tx,16.25,tz},{0.13,0.25,0.13},orange,0,0,0,true);
@@ -176,6 +176,11 @@ void Scene::buildBoosters() {
     add(boosterParts_,box,{0.49,1.2,0},{0.65,1.25,0.10},steel,0.45f);
     for (double height : {2.45,5.3})
         add(boosterParts_,box,{-0.50,height,0},{0.14,0.24,0.20},dark,0.45f);
+}
+
+math3d::mat4 Scene::armModel(const Rocket& rocket) const {
+    const double yaw=-std::atan2(2.3,5.35)+1.3*rocket.serviceArmRetraction();
+    return math3d::transform({-5.35,10.4,-2.3},{1,1,1},yaw);
 }
 
 void Scene::draw(const Part& part, const math3d::mat4& parent) {
@@ -257,6 +262,8 @@ void Scene::render(const math3d::mat4& view, const math3d::mat4& projection,
 void Scene::drawOpaque(const Rocket& rocket, bool padLight) {
     const auto identity=math3d::identity();
     for (const auto& part : site_) draw(part,identity);
+    const auto serviceArm=armModel(rocket);
+    for (const auto& part : arm_) draw(part,serviceArm);
     if (rocket.stage()==Rocket::Stage::ready || rocket.stage()==Rocket::Stage::countdown)
         for (const auto& part : workers_) draw(part,identity);
     const auto coreModel = rocket.model();

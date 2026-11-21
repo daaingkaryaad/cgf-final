@@ -378,6 +378,31 @@ void cameraTests() {
     expect(!one.chasing() && one.view()==initial.view(),"reset clears ignition shake and chase mode");
 }
 
+void serviceArmTests() {
+    Rocket rocket;
+    expect(close(rocket.serviceArmRetraction(),0),"the service arm is attached before launch");
+    rocket.start();rocket.update(0.6);
+    const double first=rocket.serviceArmRetraction();
+    expect(first>0 && first<1,"the arm retracts during countdown");
+    rocket.update(0.6);
+    expect(rocket.serviceArmRetraction()>first && rocket.serviceArmRetraction()<1,
+           "the arm retracts smoothly toward its clear position");
+    Rocket coarse;coarse.start();coarse.update(1.2);
+    expect(close(rocket.serviceArmRetraction(),coarse.serviceArmRetraction()),
+           "arm timing is independent of the update interval");
+    rocket.update(1.2);
+    expect(rocket.stage()==Rocket::Stage::countdown && close(rocket.serviceArmRetraction(),1),
+           "the arm is fully clear before engine ignition");
+    rocket.update(0.8);
+    expect(rocket.enginesOn() && close(rocket.serviceArmRetraction(),1),
+           "the arm remains clear during ignition");
+    rocket.reset();
+    expect(close(rocket.serviceArmRetraction(),0),"reset restores the attached arm");
+    rocket.start();rocket.update(1.2);
+    expect(close(rocket.serviceArmRetraction(),coarse.serviceArmRetraction()),
+           "a second countdown repeats the arm movement");
+}
+
 void meshTest(const MeshData& mesh) {
     using namespace math3d;
     expect(!mesh.vertices.empty() && mesh.indices.size()%3==0,"valid triangle mesh");
@@ -398,7 +423,7 @@ void meshTest(const MeshData& mesh) {
 
 int main() {
     try {
-        launchTests(); boosterTests(); boosterTimingTests(); boosterMotionTests(); boosterImpactTests();
+        launchTests(); serviceArmTests(); boosterTests(); boosterTimingTests(); boosterMotionTests(); boosterImpactTests();
         landingFootprintTests(); transformTests(); cameraTests(); projectionTests();
         meshTest(geometry::box()); meshTest(geometry::plane());
         meshTest(geometry::frustum(1)); meshTest(geometry::frustum(0)); meshTest(geometry::frustum(0.58f));

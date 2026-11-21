@@ -51,6 +51,19 @@ void Scene::buildVehicle() {
     appendParts(site_,van,math3d::transform({20,-0.025,-4.2},{1,1,1},-0.08));
 }
 
+void Scene::buildServiceArm() {
+    add(site_,box,{-5.40,10.4,-2.3},{0.12,0.65,0.75},steel,0.4f);
+    add(arm_,cylinder,{0,0,0},{0.20,0.55,0.20},dark,0.55f);
+    add(arm_,box,{2.9,0,0},{5.8,0.22,0.65},yellow,0.35f);
+    add(arm_,box,{2.9,0.14,0},{5.7,0.055,0.57},steel,0.3f);
+    for (int side:{-1,1}) {
+        addBeam(arm_,box,{0.3,0.45,side*0.29},{5.6,0.45,side*0.29},0.055,yellow,0.3f);
+        for (double x:{0.4,2.1,3.8,5.5})
+            addBeam(arm_,box,{x,0.15,side*0.29},{x,0.46,side*0.29},0.045,steel,0.3f);
+    }
+    add(arm_,box,{5.77,0.06,0},{0.17,0.35,0.59},dark,0.35f);
+}
+
 void Scene::buildWorkers() {
     const vec3 positions[]={{9.1,-0.025,-5.3},{9.6,-0.025,-6.7},
                             {10.7,-0.025,-4.4},{21,-0.025,-2.2}};
