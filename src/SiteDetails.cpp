@@ -20,6 +20,37 @@ void Scene::appendParts(std::vector<Part>& target, const std::vector<Part>& part
     }
 }
 
+void Scene::buildVehicle() {
+    add(site_,plane,{19.5,-0.019,-4.2},{6.0,1,4.2},{0.60,0.58,0.49},0.02f,3);
+    for (double x:{16.65,22.35})
+        add(site_,box,{x,-0.005,-4.2},{0.07,0.015,3.9},cream,0);
+    std::vector<Part> van;
+    add(van,box,{0,0.47,0},{4.0,0.20,1.76},dark,0.35f);
+    add(van,box,{-0.35,1.03,0},{3.1,1.15,1.68},cream,0.45f);
+    add(van,box,{1.43,0.83,0},{0.96,0.70,1.68},cream,0.45f);
+    add(van,box,{0.64,1.66,0},{1.24,0.12,1.78},steel,0.45f);
+    add(van,box,{1.27,1.38,0},{0.025,0.45,1.42},glass,0.9f);
+    add(van,box,{-0.8,1.67,0},{0.6,0.10,0.16},yellow,0.3f);
+    for (int side:{-1,1}) {
+        add(van,box,{0.61,1.38,side*0.849},{1.20,0.45,0.025},glass,0.9f);
+        add(van,box,{-0.1,0.95,side*0.855},{3.65,0.13,0.025},orange,0.3f);
+        add(van,box,{-0.49,1.14,side*0.858},{0.025,0.84,0.025},steel,0.3f);
+        add(van,box,{-0.26,1.19,side*0.882},{0.21,0.045,0.025},steel,0.6f);
+        add(van,box,{1.93,0.92,side*0.60},{0.035,0.17,0.28},cream,0.5f);
+        add(van,box,{-1.92,0.79,side*0.63},{0.035,0.21,0.16},orange,0.3f);
+        for (double x:{-1.24,1.24}) {
+            const double z=side*0.91;
+            addBeam(van,cylinder,{x,0.37,z-0.13},{x,0.37,z+0.13},0.37,rubber,0.08f);
+            const double outer=z+side*0.14;
+            addBeam(van,cylinder,{x,0.37,outer-0.015},{x,0.37,outer+0.015},0.17,steel,0.65f);
+        }
+    }
+    for (int end:{-1,1})
+        add(van,box,{end*1.99,0.52,0},{0.13,0.20,1.84},steel,0.45f);
+    add(van,box,{1.93,0.69,0},{0.035,0.19,0.68},dark,0.2f);
+    appendParts(site_,van,math3d::transform({20,-0.025,-4.2},{1,1,1},-0.08));
+}
+
 void Scene::buildWorkers() {
     const vec3 positions[]={{9.1,-0.025,-5.3},{9.6,-0.025,-6.7},
                             {10.7,-0.025,-4.4},{21,-0.025,-2.2}};

@@ -39,6 +39,7 @@ private:
     void initShadowMap();
     math3d::mat4 renderShadowMap(const Rocket& rocket, bool padLight);
     void drawOpaque(const Rocket& rocket, bool padLight);
+    void buildVehicle();
     void buildEquipment();
     void buildWorkers();
     void addBeam(std::vector<Part>& list, Shape shape, const math3d::vec3& a,

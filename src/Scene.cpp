@@ -21,6 +21,7 @@ Scene::Scene(const std::string& directory)
     glGenVertexArrays(1,&skyVao_);
     initShadowMap();
     buildSite();
+    buildVehicle();
     buildEquipment();
     buildWorkers();
     buildRocket();
