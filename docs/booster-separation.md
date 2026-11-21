@@ -24,8 +24,12 @@ point of the rotated booster envelope reaches the terrain plane at
 `y = -0.025`. The envelope approximates the nozzle, skirt, shell, nose, and
 fin; it does not collide with site props. All four boosters share the same
 contact time because their mounting yaws do not change height.
-`boostersVisible()` becomes false at impact, and the stored pose stops at
-contact even if an update spans the whole descent. Reset returns all four
+`boostersVisible()` remains true throughout the flight and after landing.
+After contact, a 0.8-second settling phase rotates each booster into a horizontal
+resting pose, adds a small damped rock, and reduces its sliding speed to zero.
+The support height is recalculated from the rotated envelope so the assembly
+rests on the terrain. The final pose stays fixed until reset, even when a large
+update spans the entire descent and settling phase. Reset returns all four
 boosters to their pad mounts and allows another launch.
 
 ## Model transforms and rendering
@@ -37,13 +41,17 @@ returns the world matrix `coreModel * T(1.38 * d) * Ry(-theta)`. The yaw
 points each fin away from the core.
 
 After release, let `a` be seconds since separation and
-`e = a² / (a + 0.12)`. The center moves along `d` at radius
-`1.38 + 4.5 * e`. Its height is
+`e = a² / (a + 0.12)` and
+`drift = (cos(theta + pi/8), 0, sin(theta + pi/8))`.
+The horizontal center is `1.38 * d + 4.5 * e * drift`. The extra 22.5-degree
+drift angle directs the boosters through clear corridors around the launch site.
+Its height is
 `0.65 + 54 + 3.2 + vRelease * a - 0.5 * 14 * a²`, where
 `vRelease = 1.1 * sqrt(2 * 54 / 1.1)`. It therefore inherits the core's
 upward velocity, then falls under the demo's constant downward acceleration.
 The derivative of `e` starts at zero and rises toward one, so outward motion
-and rotation start smoothly. The radius keeps increasing after release.
+and rotation start smoothly. Outward travel continues until terrain contact,
+then the short settling slide brings it to a stop.
 
 The detached world matrix is
 `T(center) * Ry(-theta) * Rz(-1.25 * e) * Ry(0.32 * e) * T(-pivot)`,
@@ -71,28 +79,23 @@ so there is no separate render state to reset.
    fin directions, attachment, exact release and pose continuity, long
    updates, symmetry, smooth and monotonic outward motion, frame partitioning,
    visibility after core stop, terrain contact with fine and coarse updates,
+   horizontal settling, persistent resting poses, complete landing footprints,
    reset, and relaunch.
 2. With a C++ compiler, `pkg-config`, GLEW, and GLFW installed, run `make`
    and then `./baikonur` from the repository root.
-3. Press **Space** and watch the attached ascent. Use **E** to rise and
-   click or press **Tab** to aim with the mouse if the rocket leaves the
-   starting view. At roughly 14 seconds the four boosters peel outward;
-   follow them as they tumble and fall while the core climbs. **R** restores
-   the pad view and all four attached boosters; press **Space** again to repeat.
+3. Press **C** to enable the chase camera, then **Space** to start the launch.
+   At roughly 14 seconds the four boosters peel outward while the core climbs.
+   Press **H** after landing to return to the launch-site view and inspect the
+   boosters on the terrain. **R** restores the pad view and all four attached
+   boosters; press **C** and **Space** again to repeat in chase mode.
 4. For an OpenGL smoke check from the default view, render hidden frames on
    the pad, during ignition and ascent, during separation and the final fall,
    and after impact:
 
    ```sh
    ./baikonur --hidden --frames 1 --capture /tmp/baikonur-pad.ppm
-   for time in 3.5 7.0 14.9 17.78 17.9; do
+   for time in 3.5 7.0 14.9 17.78 17.9 19.0; do
        ./baikonur --hidden --frames 1 --simulate "$time" \
            --capture "/tmp/baikonur-$time.ppm" || break
    done
    ```
-
-AI assistance disclosure: OpenAI Codex inspected the existing booster
-implementation, made the follow-up changes to the animation, terrain contact,
-and booster details, added tests, ran the build and verification commands, and
-updated this document. The original booster implementation and the rest of the
-team's project were already present.
